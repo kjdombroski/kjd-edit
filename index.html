@@ -126,6 +126,25 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
 .strip .vol{font:11px var(--mono);text-align:center;background:#1b1b1b;border:1px solid #000;border-radius:2px;padding:3px}
 .strip .nm{font-weight:bold;text-align:center;background:#1b1b1b;border:1px solid #000;border-radius:2px;padding:5px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:4px solid}
 .strip.sel .nm{background:#e2e2e2;color:#111}
+.hd .rz{position:absolute;left:0;right:0;bottom:0;height:10px;cursor:ns-resize;touch-action:none;z-index:2}
+.hd .rz:hover,.hd .rz.act{background:linear-gradient(transparent 6px,var(--blue) 6px)}
+.hd button.fxb{font-size:10px;min-width:30px}.hd button.fxb.has{background:linear-gradient(#5f6e86,#46536a);color:#fff}
+.strip .ins{display:flex;flex-direction:column;gap:2px}
+.strip .ins button{min-height:22px;font-size:10px;padding:0 4px;text-align:left;overflow:hidden;text-overflow:ellipsis;background:#1b1b1b;color:var(--dim)}
+.strip .ins button.has{background:linear-gradient(#5f6e86,#46536a);color:#fff}.strip .ins button.byp{opacity:.5;text-decoration:line-through}
+#plug{position:fixed;right:16px;top:120px;width:min(380px,94vw);max-height:78dvh;overflow:auto;background:#2f2f2f;border:1px solid #000;border-radius:8px;box-shadow:0 16px 50px #000b;z-index:45;display:none}
+#plug.open{display:block}
+#plug .ph{display:flex;justify-content:space-between;align-items:center;padding:6px 8px 6px 12px;background:#3a3a3a;border-bottom:1px solid #000;cursor:move;touch-action:none;position:sticky;top:0}
+#plug .ph button{min-height:30px;min-width:34px}
+#plug .slots{display:flex;flex-direction:column;gap:3px;padding:8px}
+#plug .slot{min-height:32px;text-align:left;display:flex;gap:8px;align-items:center;font-size:13px}
+#plug .slot b{color:var(--dim);width:14px}#plug .slot.cur{outline:2px solid var(--blue)}#plug .slot.byp{opacity:.55}
+#plug select.slot{width:100%;color:var(--dim)}
+#plug .pe{padding:4px 12px 12px}#plug .pe p{color:var(--dim);font-size:11px}
+#plug .ptitle{display:flex;justify-content:space-between;align-items:center;gap:6px;margin:4px 0 8px;flex-wrap:wrap}
+#plug .ptitle span{display:flex;gap:4px}#plug .ptitle button{min-height:28px;font-size:11px;padding:0 7px}
+#plug .prm{display:grid;grid-template-columns:96px 1fr 78px;align-items:center;gap:8px;font-size:12px;padding:3px 0}
+#plug .prm input{accent-color:#9fc0ff;height:28px}#plug .prm i{font:11px var(--mono);font-style:normal;text-align:right;color:var(--ctr)}
 /* touch bar + status */
 #cmds{display:flex;gap:4px;padding:5px 8px;background:var(--tb);border-top:1px solid #000;overflow-x:auto;scrollbar-width:none}
 #cmds.hide{display:none}
@@ -157,7 +176,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
   <div id="menubar">
     <span class="app">KJD Edit</span>
     <button class="mb" data-menu="File">File</button><button class="mb" data-menu="Edit">Edit</button><button class="mb" data-menu="View">View</button><button class="mb" data-menu="Track">Track</button><button class="mb" data-menu="Clip">Clip</button><button class="mb" data-menu="Window">Window</button>
-    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.4.0</span></div>
+    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.5.0</span></div>
   </div>
   <header id="tb">
     <div class="blk modes" id="modes" aria-label="Edit modes">
@@ -217,6 +236,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
   <div id="status"><span id="msg">Ready</span><span id="modeTxt"></span><span id="saveTxt"></span></div>
 </div>
 <div id="dlg"><div class="box" id="dlgBox"></div></div>
+<div id="plug" role="dialog" aria-label="Plugins"><div id="plugIn"></div></div>
 <input type="file" id="fileIn" accept="audio/*,.wav,.wave,.bwf,.aif,.aiff,.aifc,.mp3,.m4a,.flac,.caf" multiple hidden>
 <input type="file" id="sessIn" accept=".zip,application/zip" hidden>
 <script>
@@ -253,8 +273,8 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 const esc=s=>String(s).replace(/[&<>"]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
 function snap(label){undoS.push(JSON.stringify({S,sel}));if(undoS.length>200)undoS.shift();redoS=[];changed(label)}
 function changed(label){dirty=true;if(label)msg(label);scheduleSave();renderLists();draw()}
-function undo(){if(!undoS.length)return msg("Nothing to undo");redoS.push(JSON.stringify({S,sel}));const o=JSON.parse(undoS.pop());S=o.S;sel=o.sel;renderHeads();changed("Undo")}
-function redo(){if(!redoS.length)return msg("Nothing to redo");undoS.push(JSON.stringify({S,sel}));const o=JSON.parse(redoS.pop());S=o.S;sel=o.sel;renderHeads();changed("Redo")}
+function undo(){if(!undoS.length)return msg("Nothing to undo");redoS.push(JSON.stringify({S,sel}));const o=JSON.parse(undoS.pop());S=o.S;sel=o.sel;renderHeads();rewireAll();if($("plug").classList.contains("open"))renderPlug();changed("Undo")}
+function redo(){if(!redoS.length)return msg("Nothing to redo");undoS.push(JSON.stringify({S,sel}));const o=JSON.parse(redoS.pop());S=o.S;sel=o.sel;renderHeads();rewireAll();if($("plug").classList.contains("open"))renderPlug();changed("Redo")}
 function msg(t){$("msg").textContent=t}
 
 // ===================== time =====================
@@ -331,8 +351,11 @@ trackNav(dir,extend){const V=vis();if(!V.length)return;const ix=sel.tr.map(id=>V
 zoom(f,at){const cw=cvW();const ax=at===undefined?(cursorVisible()?(sel.t0-view.x0)*view.pps:cw/2):at;const tAt=view.x0+ax/view.pps;view.pps=clamp(view.pps*f,0.02,SRr()/2);view.x0=Math.max(0,tAt-ax/view.pps);draw()},
 zoomFit(){const e=Math.max(sessEnd(),10);view.pps=cvW()/(e*1.04);view.x0=0;draw();msg("Zoom to Session")},
 zoomPreset(n){if(!ZPRE[n])return CMD.zoomFit();const at=sel.t0;view.pps=cvW()/ZPRE[n];view.x0=Math.max(0,at-ZPRE[n]*0.3);draw();msg("Zoom preset "+n)},
-zoomToggle(){if(view._prev){Object.assign(view,view._prev);view._prev=null;draw();return msg("Zoom Toggle off")}
-  if(!need(hasRange(),"Select a range to zoom"))return;view._prev={x0:view.x0,pps:view.pps};const L=sel.t1-sel.t0;view.pps=cvW()/(L*1.1);view.x0=Math.max(0,sel.t0-L*0.05);draw();msg("Zoom Toggle on")},
+zoomToggle(){if(view._prev){const pv=view._prev;view._prev=null;view.x0=pv.x0;view.pps=pv.pps;view.y0=pv.y0;S.tracks.forEach(t=>{if(pv.h[t.id])t.h=pv.h[t.id]});renderHeads();draw();scheduleSave();return msg("Zoom Toggle off")}
+  let ts=selTracks();if(!ts.length&&vis().length){const r=rowTops().find(r=>r.y+r.h>RULER_H);if(r)ts=[r.t]}if(!need(ts.length||hasRange(),"Select a track or range"))return;
+  const pv={x0:view.x0,pps:view.pps,y0:view.y0,h:{}};if(hasRange()){const L=sel.t1-sel.t0;view.pps=cvW()/(L*1.1);view.x0=Math.max(0,sel.t0-L*0.05)}
+  const hh=clamp(Math.floor((cvH()-RULER_H-6)/Math.max(1,ts.length)),60,1400);ts.forEach(t=>{pv.h[t.id]=t.h;t.h=hh});view._prev=pv;
+  let y=0;for(const t of vis()){if(t===ts[0])break;y+=t.h}view.y0=Math.max(0,y);renderHeads();draw();msg("Zoom Toggle on")},
 rtz(){sel.t0=sel.t1=0;view.x0=0;if(playing){stop();play()}draw()},
 toEnd(){const e=sessEnd();sel.t0=sel.t1=e;ensureVisible(e);draw()},
 locate(d){const p=Math.max(0,sel.t0+d);sel.t0=sel.t1=p;ensureVisible(p);if(playing){stop();play()}draw()},
@@ -344,7 +367,7 @@ toggleLoop(){loop=!loop;ui();msg("Loop playback "+(loop?"on":"off"))},
 toggleFollow(){follow=!follow;ui();msg("Insertion follows playback "+(follow?"on":"off"))},
 toggleHalf(){togglePlay(0.5)},
 trackMS(k){if(!sel.tr.length)return;snap();const ts=selTracks();const v=!ts[0][k];ts.forEach(t=>t[k]=v);renderHeads();updateMix();changed((k==="mute"?"Mute":"Solo")+" "+(v?"on":"off"))},
-trackHeight(d){const ts=sel.tr.length?selTracks():vis();ts.forEach(t=>{const i=HEIGHTS.indexOf(t.h);t.h=HEIGHTS[clamp((i<0?1:i)+d,0,HEIGHTS.length-1)]});renderHeads();draw();scheduleSave()},
+trackHeight(d){const ts=sel.tr.length?selTracks():vis();ts.forEach(t=>{const nx=d>0?HEIGHTS.find(h=>h>t.h+1):HEIGHTS.slice().reverse().find(h=>h<t.h-1);t.h=nx||t.h});renderHeads();draw();scheduleSave()},
 newTracks(){dialog("New Tracks",`<div class="f">Number<input type="number" id="dN" value="1" min="1" max="32"></div><div class="f">Name<input type="text" id="dNm" value="Audio"></div>`,["Cancel","Create"]).then(r=>{if(r!=="Create")return;
   snap();const n=clamp(parseInt($("dN").value)||1,1,32),nm=$("dNm").value.trim()||"Audio";const ids=[];for(let i=0;i<n;i++)ids.push(addTrack(n>1?`${nm} ${i+1}`:nm).id);sel.tr=ids;renderHeads();changed("New Track"+(n>1?"s":""))})},
 deleteTracks(){const ts=selTracks();if(!need(ts.length,"Select tracks to delete"))return;dialog("Delete Tracks",`<p>Delete ${ts.map(t=>"“"+esc(t.name)+"”").join(", ")} and their clips? Undo restores them.</p>`,["Cancel","Delete"]).then(r=>{if(r!=="Delete")return;
@@ -405,7 +428,7 @@ const KEYS=[
 ["Comma","Nudge back",()=>CMD.nudge(-1),1],["Period","Nudge forward",()=>CMD.nudge(1),1],["NumpadSubtract","Nudge back",()=>CMD.nudge(-1)],["NumpadAdd","Nudge forward",()=>CMD.nudge(1)],
 ["Zoom & view"],
 ["Meta+BracketRight","Zoom in",()=>CMD.zoom(2)],["Meta+BracketLeft","Zoom out",()=>CMD.zoom(.5)],["KeyT","Zoom in",()=>CMD.zoom(2),1],["KeyR","Zoom out",()=>CMD.zoom(.5),1],
-["KeyE","Zoom toggle (to selection)",()=>CMD.zoomToggle(),1],["Alt+KeyA","Zoom to fit session",()=>CMD.zoomFit()],
+["KeyE","Zoom toggle (enlarge tracks + zoom to selection)",()=>CMD.zoomToggle(),1],["Alt+KeyA","Zoom to fit session",()=>CMD.zoomFit()],
 ["Digit1","Zoom preset 1 (session)",()=>CMD.zoomPreset(1),1],["Digit2","Zoom preset 2 (1 min)",()=>CMD.zoomPreset(2),1],["Digit3","Zoom preset 3 (10 sec)",()=>CMD.zoomPreset(3),1],["Digit4","Zoom preset 4 (1 sec)",()=>CMD.zoomPreset(4),1],["Digit5","Zoom preset 5 (100 ms)",()=>CMD.zoomPreset(5),1],
 ["Ctrl+ArrowUp","Taller track height",()=>CMD.trackHeight(1)],["Ctrl+ArrowDown","Shorter track height",()=>CMD.trackHeight(-1)],
 ["Meta+Equal","Toggle Mix / Edit window",()=>CMD.toggleMix()],
@@ -480,8 +503,8 @@ function ensureCtx(){
 function updRate(){const r=SRr();$("rateTxt").textContent=(r/1000)+" kHz"+(ctx&&ctx.sampleRate!==r?` (device ${ctx.sampleRate/1000})`:"")}
 function fadeVal(shape,x){return shape==="lin"?x:shape==="s"?0.5-0.5*Math.cos(Math.PI*x):shape==="exp"?x*x:shape==="log"?Math.sqrt(x):Math.sin(x*Math.PI/2)}
 function audible(t){const anySolo=S.tracks.some(x=>x.solo&&!x.hidden);return !t.mute&&!t.hidden&&(!anySolo||t.solo)}
-function buildTrackNodes(ac,dest,meters){const m=new Map();S.tracks.forEach(t=>{const g=ac.createGain(),p=ac.createStereoPanner();g.gain.value=audible(t)?db2g(t.vol):0;p.pan.value=t.pan;g.connect(p);p.connect(dest);g._p=p;
-  if(meters){const a=ac.createAnalyser();a.fftSize=512;p.connect(a);g._a=a}m.set(t.id,g)});return m}
+function buildTrackNodes(ac,dest,meters){const m=new Map();S.tracks.forEach(t=>{const inp=ac.createGain(),g=ac.createGain(),p=ac.createStereoPanner();g.gain.value=audible(t)?db2g(t.vol):0;p.pan.value=t.pan;g.connect(p);p.connect(dest);inp._v=g;inp._p=p;
+  chainTrack(ac,inp,t);if(meters){const a=ac.createAnalyser();a.fftSize=512;p.connect(a);inp._a=a}m.set(t.id,inp)});return m}
 function schedule(ac,tn,s0,s1,when,r,list,onlyClips){
   S.tracks.forEach(t=>{const out=tn.get(t.id);if(!out)return;t.clips.forEach(c=>{
     if(c.muted||(onlyClips&&!onlyClips.includes(c)))return;const b=bufs.get(c.buf);if(!b)return;
@@ -505,10 +528,10 @@ function play(rate){ensureCtx();rate=rate||1;half=rate<1;const ses=Math.max(sess
     else if(playPos()>=pl.end)stop()},100);
   requestAnimationFrame(tick)}
 function playPos(){if(!pl)return sel.t0;const el=Math.max(0,ctx.currentTime-pl.when)*pl.rate;if(pl.lp){const L=pl.s1-pl.s0;return pl.s0+(el%L)}return pl.s0+el}
-function stop(){if(!pl)return;const pos=playPos();clearInterval(pl.timer);pl.list.forEach(s=>{try{s.stop()}catch(e){}});pl.tn.forEach(g=>{try{g.disconnect();g._p.disconnect()}catch(e){}});
+function stop(){if(!pl)return;const pos=playPos();clearInterval(pl.timer);pl.list.forEach(s=>{try{s.stop()}catch(e){}});pl.tn.forEach(g=>{try{(g._fx||[]).forEach(f=>f.output.disconnect());g.disconnect();g._v.disconnect();g._p.disconnect()}catch(e){}});
   if(follow&&!pl.lp&&!(pl.s1<Infinity)){sel.t0=sel.t1=Math.min(pos,pl.end)}pl=null;playing=false;half=false;ui();draw();drawOv();msg("Stop");clearMeters()}
 function togglePlay(r){ensureCtx();if(playing)stop();else play(r)}
-function updateMix(){if(!pl)return;S.tracks.forEach(t=>{const g=pl.tn.get(t.id);if(g){g.gain.setTargetAtTime(audible(t)?db2g(t.vol):0,ctx.currentTime,0.02);g._p.pan.setTargetAtTime(t.pan,ctx.currentTime,0.02)}})}
+function updateMix(){if(!pl)return;S.tracks.forEach(t=>{const g=pl.tn.get(t.id);if(g){g._v.gain.setTargetAtTime(audible(t)?db2g(t.vol):0,ctx.currentTime,0.02);g._p.pan.setTargetAtTime(t.pan,ctx.currentTime,0.02)}})}
 const mbuf=new Float32Array(1024);
 function peakDb(an){an.getFloatTimeDomainData(mbuf);let pk=0;const n=an.fftSize;for(let i=0;i<n;i++){const v=Math.abs(mbuf[i]);if(v>pk)pk=v}return 20*Math.log10(pk+1e-9)}
 const mh=db=>clamp((db+60)/60*100,0,100)+"%";
@@ -711,9 +734,80 @@ let gs=null;ed.addEventListener("gesturestart",e=>{e.preventDefault();gs=view.pp
 ed.addEventListener("gesturechange",e=>{e.preventDefault();if(gs&&ptrs.size<2){const rect=ed.getBoundingClientRect();const ax=isFinite(e.clientX)?e.clientX-rect.left:cvW()/2;const tAt=view.x0+ax/view.pps;view.pps=clamp(gs*e.scale,0.02,SRr()/2);view.x0=Math.max(0,tAt-ax/view.pps);draw()}});
 document.addEventListener("gesturestart",e=>e.preventDefault());
 // vertical scroll by dragging the track headers
-{let hy=null;$("heads").addEventListener("pointerdown",e=>{if(e.target.closest("button,input")||e.target.closest("#rulerLabs"))return;hy={y:e.clientY,y0:view.y0,moved:false}});
+{let hy=null;$("heads").addEventListener("pointerdown",e=>{if(e.target.closest("button,input,.rz")||e.target.closest("#rulerLabs"))return;hy={y:e.clientY,y0:view.y0,moved:false}});
  window.addEventListener("pointermove",e=>{if(!hy)return;if(Math.abs(e.clientY-hy.y)>6)hy.moved=true;if(hy.moved){view.y0=clamp(hy.y0-(e.clientY-hy.y),0,maxY());draw()}});
  window.addEventListener("pointerup",()=>{if(hy&&hy.moved)hy.block=performance.now();window._hyBlock=hy&&hy.moved?performance.now():0;hy=null})}
+
+// ===================== plugins (inserts A–E, pre-fader, printed in bounces) =====================
+const FXDEF={
+ eq:{name:"EQ 4-Band",p:[["hpf","HPF",20,1000,20,"Hz",1],["lsf","Low freq",30,600,100,"Hz",1],["lsg","Low gain",-18,18,0,"dB"],["mf","Mid freq",150,10000,1000,"Hz",1],["mg","Mid gain",-18,18,0,"dB"],["mq","Mid Q",0.3,8,1,"",1],["hsf","High freq",1500,18000,8000,"Hz",1],["hsg","High gain",-18,18,0,"dB"]]},
+ comp:{name:"Compressor",p:[["thr","Threshold",-60,0,-18,"dB"],["ratio","Ratio",1,20,4,":1",1],["att","Attack",0.1,200,10,"ms",1],["rel","Release",10,2000,150,"ms",1],["knee","Knee",0,30,6,"dB"],["mk","Makeup",0,24,0,"dB"]]},
+ lim:{name:"Limiter",p:[["thr","Threshold",-30,0,-6,"dB"],["rel","Release",5,1000,60,"ms",1],["ceil","Output ceiling",-12,0,-0.3,"dB"]]},
+ trim:{name:"Trim",p:[["g","Gain",-24,24,0,"dB"],["inv","Phase invert",0,1,0,"",0,1]]},
+ delay:{name:"Delay",p:[["t","Time",1,2000,375,"ms",1],["fb","Feedback",0,95,30,"%"],["lp","Tone (low-pass)",800,20000,8000,"Hz",1],["mix","Mix",0,100,25,"%"]]},
+ verb:{name:"Reverb",p:[["dec","Decay",0.2,8,1.8,"s",1],["pre","Pre-delay",0,200,15,"ms"],["damp","Damping",800,20000,7000,"Hz",1],["mix","Mix",0,100,20,"%"]]},
+};
+const FXORDER=["eq","comp","lim","trim","delay","verb"];
+const fxDefaults=type=>Object.fromEntries(FXDEF[type].p.map(q=>[q[0],q[4]]));
+function irBuf(ac,dec){const sr=ac.sampleRate,n=Math.max(1,Math.floor(Math.min(dec,8)*sr)),b=ac.createBuffer(2,n,sr);let s=12345;const rnd=()=>{s=(s*1664525+1013904223)>>>0;return s/4294967296*2-1};
+  for(let c=0;c<2;c++){const d=b.getChannelData(c);for(let i=0;i<n;i++)d[i]=rnd()*Math.exp(-6.9*i/(dec*sr))}return b}
+function makeFx(ac,fx){const T=ac.currentTime,first={v:true};
+  const sv=(prm,v)=>{if(first.v)prm.value=v;else prm.setTargetAtTime(v,ac.currentTime,0.015)};
+  if(!fx.on){const g=ac.createGain();return {id:fx.id,input:g,output:g,set(){}}}
+  const p=fx.p,o={id:fx.id};
+  if(fx.type==="eq"){const hp=ac.createBiquadFilter(),ls=ac.createBiquadFilter(),pk=ac.createBiquadFilter(),hs=ac.createBiquadFilter();hp.type="highpass";ls.type="lowshelf";pk.type="peaking";hs.type="highshelf";hp.Q.value=0.707;
+    hp.connect(ls);ls.connect(pk);pk.connect(hs);o.input=hp;o.output=hs;o.set=p=>{sv(hp.frequency,p.hpf);sv(ls.frequency,p.lsf);sv(ls.gain,p.lsg);sv(pk.frequency,p.mf);sv(pk.gain,p.mg);sv(pk.Q,p.mq);sv(hs.frequency,p.hsf);sv(hs.gain,p.hsg)}}
+  else if(fx.type==="comp"||fx.type==="lim"){const c=ac.createDynamicsCompressor(),mk=ac.createGain();c.connect(mk);o.input=c;o.output=mk;
+    if(fx.type==="lim"){const ws=ac.createWaveShaper(),post=ac.createGain();ws.oversample="4x";mk.connect(ws);ws.connect(post);o.output=post;let lc=null; // soft ceiling catches what the compressor lets through
+      o.clip=p=>{if(p.ceil===lc)return;lc=p.ceil;const cl=db2g(p.ceil),n=4096,cu=new Float32Array(n);for(let i=0;i<n;i++){const x=(i/(n-1))*4-2,ax=Math.abs(x),k=cl*0.85;cu[i]=Math.sign(x)*(ax<=k?ax:k+(cl-k)*Math.tanh((ax-k)/(cl-k)))}ws.curve=cu}}
+    const auto=(thr,ratio)=>0.6*(-thr)*(1-1/ratio); // Web Audio's compressor adds hidden makeup gain — cancel it so Makeup/Output are honest
+    o.set=fx.type==="comp"?p=>{sv(c.threshold,p.thr);sv(c.ratio,p.ratio);sv(c.attack,p.att/1000);sv(c.release,p.rel/1000);sv(c.knee,p.knee);sv(mk.gain,db2g(p.mk-auto(p.thr,p.ratio)))}
+      :p=>{sv(c.threshold,p.thr);sv(c.ratio,20);sv(c.attack,0.001);sv(c.release,p.rel/1000);sv(c.knee,0);sv(mk.gain,db2g(p.ceil-p.thr-auto(p.thr,20)));o.clip(p)}}
+  else if(fx.type==="trim"){const g=ac.createGain();o.input=o.output=g;o.set=p=>sv(g.gain,db2g(p.g)*(p.inv>=0.5?-1:1))}
+  else if(fx.type==="delay"){const i=ac.createGain(),out=ac.createGain(),dry=ac.createGain(),wet=ac.createGain(),d=ac.createDelay(2.5),lp=ac.createBiquadFilter(),fb=ac.createGain();lp.type="lowpass";
+    i.connect(dry);dry.connect(out);i.connect(d);d.connect(lp);lp.connect(wet);wet.connect(out);lp.connect(fb);fb.connect(d);o.input=i;o.output=out;
+    o.set=p=>{const m=p.mix/100;sv(d.delayTime,p.t/1000);sv(fb.gain,p.fb/100);sv(lp.frequency,p.lp);sv(dry.gain,Math.cos(m*Math.PI/2));sv(wet.gain,Math.sin(m*Math.PI/2))}}
+  else if(fx.type==="verb"){const i=ac.createGain(),out=ac.createGain(),dry=ac.createGain(),wet=ac.createGain(),pd=ac.createDelay(1),cv=ac.createConvolver(),lp=ac.createBiquadFilter();lp.type="lowpass";let dec=null;
+    i.connect(dry);dry.connect(out);i.connect(pd);pd.connect(cv);cv.connect(lp);lp.connect(wet);wet.connect(out);o.input=i;o.output=out;
+    o.set=p=>{if(p.dec!==dec){dec=p.dec;cv.buffer=irBuf(ac,dec)}const m=p.mix/100;sv(pd.delayTime,p.pre/1000);sv(lp.frequency,p.damp);sv(dry.gain,Math.cos(m*Math.PI/2));sv(wet.gain,Math.sin(m*Math.PI/2))}}
+  o.set(p);first.v=false;return o}
+function chainTrack(ac,inp,t){(inp._fx||[]).forEach(f=>{try{f.output.disconnect()}catch(e){}});try{inp.disconnect()}catch(e){}
+  let node=inp;inp._fx=(t.fx||[]).map(fx=>{const f=makeFx(ac,fx);node.connect(f.input);node=f.output;return f});node.connect(inp._v)}
+function rewire(t){if(!pl)return;const n=pl.tn.get(t.id);if(n)chainTrack(ctx,n,t)}
+function rewireAll(){if(pl)S.tracks.forEach(rewire)}
+function liveSet(t,fx){if(!pl)return;const n=pl.tn.get(t.id);const f=n&&(n._fx||[]).find(x=>x.id===fx.id);if(f)f.set(fx.p)}
+// ----- plugin window (floating, stays open while you work) -----
+let plugT=null,plugSel=null,plugSnap=false;
+const fxPos=(q,v)=>q[6]?Math.log(v/q[2])/Math.log(q[3]/q[2])*1000:(v-q[2])/(q[3]-q[2])*1000;
+const fxVal=(q,x)=>{let v=q[6]?q[2]*Math.pow(q[3]/q[2],x/1000):q[2]+(q[3]-q[2])*x/1000;if(q[7])return Math.round(v);return Math.abs(v)>=100?Math.round(v):Math.round(v*10)/10};
+const fxTxt=(q,v)=>q[7]?(v>=0.5?"On":"Off"):(q[5]==="Hz"&&v>=1000?(v/1000).toFixed(v>=10000?1:2)+" kHz":v+(q[5]===":1"?":1":q[5]?" "+q[5]:""));
+function openPlug(tid,fxid){plugT=tid;plugSel=fxid||null;const t=trk(tid);if(!plugSel&&t.fx&&t.fx.length)plugSel=t.fx[0].id;$("plug").classList.add("open");renderPlug()}
+function renderPlug(){const t=trk(plugT);if(!t){$("plug").classList.remove("open");return}t.fx=t.fx||[];const fx=t.fx.find(f=>f.id===plugSel);
+  const slots=[0,1,2,3,4].map(i=>{const f=t.fx[i];return f?`<button class="slot${f.id===plugSel?" cur":""}${f.on?"":" byp"}" data-pa="pick" data-id="${f.id}"><b>${"ABCDE"[i]}</b>${FXDEF[f.type].name}</button>`
+     :`<select class="slot add" data-pa="add" aria-label="Add insert ${"ABCDE"[i]}"><option value="">${"ABCDE"[i]} — add plugin…</option>${FXORDER.map(k=>`<option value="${k}">${FXDEF[k].name}</option>`).join("")}</select>`}).slice(0,Math.min(5,t.fx.length+1)).join("");
+  $("plugIn").innerHTML=`<div class="ph" data-pa="drag"><span><b>${esc(t.name)}</b> · Inserts</span><button data-pa="close" aria-label="Close">✕</button></div><div class="slots">${slots}</div>`+
+   (fx?`<div class="pe"><div class="ptitle"><b>${FXDEF[fx.type].name}</b><span><button data-pa="byp" class="${fx.on?"":"on"}">${fx.on?"Bypass":"Bypassed"}</button><button data-pa="up">▲</button><button data-pa="down">▼</button><button data-pa="reset">Reset</button><button data-pa="del">Remove</button></span></div>
+    ${FXDEF[fx.type].p.map(q=>`<label class="prm"><span>${q[1]}</span><input type="range" min="0" max="1000" step="${q[7]?1000:1}" value="${fxPos(q,fx.p[q[0]])}" data-k="${q[0]}"><i>${fxTxt(q,fx.p[q[0]])}</i></label>`).join("")}
+    <p>Double-tap a slider to reset it. Inserts are pre-fader and print into bounces; Export Clips stays dry.</p></div>`:`<p class="pe">Add a plugin from an empty slot. Up to five per track (A–E).</p>`);
+  renderHeads()}
+{const P=$("plug");
+ P.addEventListener("change",e=>{const s=e.target.closest("[data-pa='add']");if(!s||!s.value)return;const t=trk(plugT);snap();const fx={id:uid(),type:s.value,on:true,p:fxDefaults(s.value)};t.fx=t.fx||[];t.fx.push(fx);plugSel=fx.id;rewire(t);changed("Insert "+FXDEF[fx.type].name+" on "+t.name);renderPlug()});
+ P.addEventListener("click",e=>{const b=e.target.closest("[data-pa]");if(!b)return;const a=b.dataset.pa,t=trk(plugT);if(!t)return;const fx=(t.fx||[]).find(f=>f.id===plugSel);
+  if(a==="close"){P.classList.remove("open");return}
+  if(a==="pick"){plugSel=b.dataset.id;return renderPlug()}
+  if(!fx)return;const i=t.fx.indexOf(fx);
+  if(a==="byp"){snap();fx.on=!fx.on;rewire(t);changed((fx.on?"Enable ":"Bypass ")+FXDEF[fx.type].name)}
+  else if(a==="del"){snap();t.fx.splice(i,1);plugSel=t.fx[Math.max(0,i-1)]?.id||null;rewire(t);changed("Remove "+FXDEF[fx.type].name)}
+  else if(a==="reset"){snap();fx.p=fxDefaults(fx.type);liveSet(t,fx);changed("Reset "+FXDEF[fx.type].name)}
+  else if(a==="up"||a==="down"){const j=i+(a==="up"?-1:1);if(j<0||j>=t.fx.length)return;snap();[t.fx[i],t.fx[j]]=[t.fx[j],t.fx[i]];rewire(t);changed("Move insert")}
+  renderPlug()});
+ P.addEventListener("input",e=>{const k=e.target.dataset.k;if(!k)return;const t=trk(plugT),fx=t.fx.find(f=>f.id===plugSel),q=FXDEF[fx.type].p.find(q=>q[0]===k);
+  if(!plugSnap){undoS.push(JSON.stringify({S,sel}));redoS=[];plugSnap=true}fx.p[k]=fxVal(q,+e.target.value);e.target.nextElementSibling.textContent=fxTxt(q,fx.p[k]);liveSet(t,fx);dirty=true});
+ P.addEventListener("change",e=>{if(e.target.dataset.k){plugSnap=false;scheduleSave()}});
+ P.addEventListener("dblclick",e=>{const k=e.target.dataset&&e.target.dataset.k;if(!k)return;const t=trk(plugT),fx=t.fx.find(f=>f.id===plugSel),q=FXDEF[fx.type].p.find(q=>q[0]===k);snap();fx.p[k]=q[4];liveSet(t,fx);changed("Reset "+q[1]);renderPlug()});
+ let dg=null;P.addEventListener("pointerdown",e=>{if(e.target.closest("[data-pa='drag']")&&!e.target.closest("button")){const r=P.getBoundingClientRect();dg={dx:e.clientX-r.left,dy:e.clientY-r.top};P.setPointerCapture(e.pointerId)}});
+ P.addEventListener("pointermove",e=>{if(!dg)return;P.style.left=clamp(e.clientX-dg.dx,0,innerWidth-80)+"px";P.style.top=clamp(e.clientY-dg.dy,0,innerHeight-60)+"px";P.style.right="auto"});
+ P.addEventListener("pointerup",()=>{dg=null})}
 
 // ===================== track headers, lists, mix =====================
 const volTxt=v=>v<=-60?"-inf":(v>0?"+":"")+v.toFixed(1);
@@ -722,11 +816,11 @@ function renderHeads(){
   $("headsIn").innerHTML=vis().map(t=>`<div class="hd${sel.tr.includes(t.id)?" sel":""}" data-id="${t.id}" style="height:${t.h}px">
    <div class="cb" style="background:${t.color}"></div>
    <div class="body"><div class="row"><div class="nm" data-a="sel">${esc(t.name)}</div>${t.h<60?`<button class="s${t.solo?" on":""}" data-a="solo">S</button><button class="m${t.mute?" on":""}" data-a="mute">M</button>`:""}</div>
-   ${t.h>=60?`<div class="row"><button class="s${t.solo?" on":""}" data-a="solo" title="Solo">S</button><button class="m${t.mute?" on":""}" data-a="mute" title="Mute">M</button><span style="flex:1"></span><span class="io">${t.clips.length} clip${t.clips.length===1?"":"s"}</span></div>`:""}
+   ${t.h>=60?`<div class="row"><button class="s${t.solo?" on":""}" data-a="solo" title="Solo">S</button><button class="m${t.mute?" on":""}" data-a="mute" title="Mute">M</button><button class="fxb${(t.fx||[]).length?" has":""}" data-a="fx" title="Inserts / plugins">FX${(t.fx||[]).length?" "+t.fx.length:""}</button><span style="flex:1"></span><span class="io">${t.clips.length} clip${t.clips.length===1?"":"s"}</span></div>`:""}
    ${t.h>=100?`<div class="io"><span>vol</span><input type="range" min="-60" max="12" step="0.5" value="${t.vol}" data-a="vol" aria-label="Volume"><span class="v">${volTxt(t.vol)}</span></div>
    <div class="io"><span>pan</span><input type="range" min="-1" max="1" step="0.01" value="${t.pan}" data-a="pan" aria-label="Pan"><span class="v">${panTxt(t.pan)}</span></div>`:""}
    ${t.h>=160?`<div class="row"><button data-a="color">Color</button><button data-a="rename">Name</button><button data-a="hide">Hide</button></div>`:""}</div>
-   <div class="meter"><i data-mid="${t.id}"></i></div></div>`).join("");
+   <div class="meter"><i data-mid="${t.id}"></i></div><div class="rz" data-a="rz" title="Drag to resize track"></div></div>`).join("");
   renderLists();if(mixOpen)renderMix()}
 function renderLists(){
   $("tlL").innerHTML=S.tracks.map(t=>`<div class="it${sel.tr.includes(t.id)?" sel":""}" data-id="${t.id}"><span class="sw" style="background:${t.color}"></span><span>${esc(t.name)}</span><span class="eye" data-a="hide">${t.hidden?"hidden":"shown"}</span></div>`).join("")||`<div class="it" style="color:var(--dim)">No tracks</div>`;
@@ -738,6 +832,11 @@ $("tlL").addEventListener("click",e=>{const it=e.target.closest(".it[data-id]");
   if(e.target.dataset.a==="hide"){snap();t.hidden=!t.hidden;if(t.hidden)sel.tr=sel.tr.filter(x=>x!==t.id);renderHeads();updateMix();changed((t.hidden?"Hide ":"Show ")+t.name);return}
   if(t.hidden)return;sel.tr=e.shiftKey||e.metaKey?(sel.tr.includes(t.id)?sel.tr.filter(x=>x!==t.id):[...sel.tr,t.id]):[t.id];renderHeads();draw()});
 $("tlNew").onclick=()=>CMD.newTracks();
+{let rz=null;$("headsIn").addEventListener("pointerdown",e=>{const h=e.target.closest(".rz");if(!h)return;e.preventDefault();e.stopPropagation();const hd=h.closest(".hd"),t=trk(hd.dataset.id);
+  h.setPointerCapture(e.pointerId);h.classList.add("act");rz={t,hd,h,y:e.clientY,h0:t.h,undo:JSON.stringify({S,sel})}});
+ $("headsIn").addEventListener("pointermove",e=>{if(!rz)return;rz.t.h=clamp(Math.round(rz.h0+e.clientY-rz.y),40,1400);rz.hd.style.height=rz.t.h+"px";draw()});
+ const end=()=>{if(!rz)return;const r=rz;rz=null;r.h.classList.remove("act");if(r.t.h!==r.h0){undoS.push(r.undo);redoS=[];window._hyBlock=performance.now()}renderHeads();draw();scheduleSave()};
+ $("headsIn").addEventListener("pointerup",end);$("headsIn").addEventListener("pointercancel",end)}
 $("clL").addEventListener("click",e=>{const it=e.target.closest(".it[data-c]");if(!it)return;const t=trk(it.dataset.t),c=t&&t.clips.find(k=>k.id===it.dataset.c);if(!c)return;
   if(t.hidden){t.hidden=false}sel={t0:c.start,t1:cEnd(c),tr:[t.id]};if(tx(c.start)<0||tx(cEnd(c))>cvW())view.x0=Math.max(0,c.start-(cvW()*0.1)/view.pps);
   const top=rowTops().find(r=>r.t===t);if(top&&(top.y<RULER_H||top.y+top.h>cvH()))view.y0=clamp(view.y0+top.y-RULER_H-10,0,maxY());renderHeads();draw()});
@@ -747,6 +846,7 @@ $("headsIn").addEventListener("click",e=>{if(window._hyBlock&&performance.now()-
   else if(a==="mute"||a==="solo"){snap();t[a]=!t[a];renderHeads();updateMix();changed((a==="mute"?"Mute ":"Solo ")+t.name)}
   else if(a==="color"){snap();t.color=COLORS[(COLORS.indexOf(t.color)+1)%COLORS.length];renderHeads();changed("Track color")}
   else if(a==="rename")renameTrack(t);
+  else if(a==="fx")openPlug(t.id);
   else if(a==="hide"){snap();t.hidden=true;sel.tr=sel.tr.filter(x=>x!==t.id);renderHeads();updateMix();changed("Hide "+t.name)}});
 let sliderSnap=false;
 $("headsIn").addEventListener("input",e=>{const hd=e.target.closest(".hd");const t=trk(hd.dataset.id);if(!sliderSnap){undoS.push(JSON.stringify({S,sel}));redoS=[];sliderSnap=true}
@@ -760,13 +860,14 @@ const fVal=y=>{const x=Math.pow(clamp(1-y,0,1),1/1.6);const v=x*72-60;return v<-
 function renderMix(){
   $("mix").innerHTML=vis().map(t=>`<div class="strip${sel.tr.includes(t.id)?" sel":""}" data-id="${t.id}">
     <div class="knob" data-a="pan" title="Pan — drag sideways, double-tap to center"><i style="transform:translateX(-50%) rotate(${t.pan*135}deg);transform-origin:50% 100%"></i>${panTxt(t.pan)}</div>
-    <div class="ms"><button class="s${t.solo?" on":""}" data-a="solo">S</button><button class="m${t.mute?" on":""}" data-a="mute">M</button></div>
+    <div class="ins">${[0,1,2,3,4].map(i=>{const f=(t.fx||[])[i];return `<button data-a="ins" data-i="${i}" class="${f?(f.on?"has":"has byp"):""}">${f?FXDEF[f.type].name:"·"}</button>`}).join("")}</div><div class="ms"><button class="s${t.solo?" on":""}" data-a="solo">S</button><button class="m${t.mute?" on":""}" data-a="mute">M</button></div>
     <div class="fz"><div class="fader" data-a="vol"><div class="cap" style="top:calc(6px + (100% - 12px) * ${fPos(t.vol)})"></div></div><div class="mtr"><i data-mid="${t.id}"></i></div></div>
     <div class="vol">${volTxt(t.vol)}</div><div class="nm" data-a="sel" style="border-bottom-color:${t.color}">${esc(t.name)}</div></div>`).join("")||`<div style="color:var(--dim);padding:20px">No tracks</div>`}
 {let md=null;
  $("mix").addEventListener("pointerdown",e=>{const st=e.target.closest(".strip");if(!st)return;const t=trk(st.dataset.id);const a=e.target.closest("[data-a]")?.dataset.a;
   if(a==="solo"||a==="mute"){snap();t[a]=!t[a];renderHeads();updateMix();changed((a==="mute"?"Mute ":"Solo ")+t.name);return}
   if(a==="sel"){sel.tr=[t.id];renderHeads();draw();return}
+  if(a==="ins"){const f=(t.fx||[])[+e.target.closest("[data-i]").dataset.i];openPlug(t.id,f&&f.id);return}
   if(a==="vol"||a==="pan"){e.preventDefault();const el=e.target.closest("[data-a]");el.setPointerCapture(e.pointerId);
     const now=performance.now();if(md&&md.id===t.id&&md.a===a&&now-md.t<320){snap();if(a==="pan")t.pan=0;else t.vol=0;updateMix();renderMix();renderHeads();md=null;return}
     undoS.push(JSON.stringify({S,sel}));redoS=[];md={id:t.id,a,el,x:e.clientX,y:e.clientY,v0:a==="pan"?t.pan:t.vol,t:now,fine:e.shiftKey}}});
@@ -959,7 +1060,7 @@ document.addEventListener("visibilitychange",()=>{if(document.hidden&&dirty)save
 ui();renderHeads();resize();updRate();restore();
 try{if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")&&!/claude|anthropic/.test(location.host))navigator.serviceWorker.register("sw.js").catch(()=>{})}catch(e){}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
-window.__kjd={get S(){return S},set S(v){S=v},get sel(){return sel},set sel(v){sel=v},CMD,addTrack,newClip,bufs,regBuf,setMode:m=>{mode=m},undo,redo,zip,unzip,wav,parseWav,parseAiff,resample,sessEnd,renderHeads,renderMix};
+window.__kjd={renderRange,get S(){return S},set S(v){S=v},get sel(){return sel},set sel(v){sel=v},CMD,addTrack,newClip,bufs,regBuf,setMode:m=>{mode=m},undo,redo,zip,unzip,wav,parseWav,parseAiff,resample,sessEnd,renderHeads,renderMix};
 }
 </script>
 </body>
