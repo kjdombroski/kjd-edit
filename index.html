@@ -34,7 +34,9 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
 #menubar .mb{background:none;border:0;min-height:28px;padding:0 10px;border-radius:4px}
 #menubar .mb.open{background:var(--blue);color:#fff}
 #menubar .app{font-weight:bold;margin-right:6px}
-#menubar .r{margin-left:auto;color:var(--dim);font:11px var(--mono);display:flex;gap:12px}
+#menubar .r{margin-left:auto;color:var(--dim);font:11px var(--mono);display:flex;gap:12px;align-items:center}
+#menubar .ob1{font:11px var(--mono);color:var(--dim);padding:0 8px;min-height:24px;background:none;border:1px solid #333}#menubar .ob1.q{color:#111;background:var(--solo)}
+#dlg .ob{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid #ffffff12}#dlg .ob>div{flex:1;display:flex;flex-direction:column;gap:2px}#dlg .ob span{color:var(--dim);font-size:11px;overflow-wrap:anywhere}#dlg .ob button{min-height:34px}
 .menu{position:fixed;z-index:40;background:#2b2b2b;border:1px solid #000;border-radius:6px;padding:4px;min-width:280px;box-shadow:0 12px 40px #000c;max-height:80dvh;overflow:auto}
 .menu button{display:flex;justify-content:space-between;gap:24px;width:100%;background:none;border:0;min-height:34px;padding:0 10px;border-radius:4px;font-size:13px;text-align:left}
 .menu button:hover,.menu button:active{background:var(--blue);color:#fff}
@@ -155,7 +157,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
   <div id="menubar">
     <span class="app">KJD Edit</span>
     <button class="mb" data-menu="File">File</button><button class="mb" data-menu="Edit">Edit</button><button class="mb" data-menu="View">View</button><button class="mb" data-menu="Track">Track</button><button class="mb" data-menu="Clip">Clip</button><button class="mb" data-menu="Window">Window</button>
-    <div class="r"><span id="sessName">Untitled Session</span><span id="rateTxt">48 kHz</span><span>v0.3.0</span></div>
+    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.4.0</span></div>
   </div>
   <header id="tb">
     <div class="blk modes" id="modes" aria-label="Edit modes">
@@ -227,7 +229,7 @@ const GRID=[["0.001","1 ms"],["0.01","10 ms"],["0.1","100 ms"],["0.5","500 ms"],
 const NUDGE=[["0.001","1 ms"],["0.01","10 ms"],["0.1","100 ms"],["0.5","500 ms"],["1","1 sec"],["0.0333333333","1 frame (30)"]];
 const ZPRE={1:null,2:60,3:10,4:1,5:0.1}; // seconds across the screen; 1 = whole session
 const RULER_H=44;
-let S={name:"Untitled Session",sr:null,tracks:[]};
+let S={id:null,name:"Untitled Project",sr:null,tracks:[]};
 let sel={t0:0,t1:0,tr:[]};
 const bufs=new Map();
 let view={x0:0,pps:40,y0:0};
@@ -412,7 +414,7 @@ const KEYS=[
 ["Shift+KeyM","Mute selected tracks",()=>CMD.trackMS("mute")],["Shift+KeyS","Solo selected tracks",()=>CMD.trackMS("solo")],
 ["File"],
 ["Shift+Meta+KeyI","Import audio…",()=>$("fileIn").click()],["Alt+Meta+KeyB","Bounce mix…",()=>bounceDlg()],["Shift+Meta+KeyK","Export clips as files…",()=>exportClips()],
-["Meta+KeyS","Save (on this iPad)",()=>saveNow(true)],["Shift+Meta+KeyS","Save session copy (.zip)…",()=>saveSessionZip()],["Meta+KeyO","Open session (.zip)…",()=>$("sessIn").click()],
+["Meta+KeyS","Save (+ queue iCloud copy)",()=>saveNow(true)],["Shift+Meta+KeyS","Save project to iCloud…",()=>saveProjectICloud()],["Meta+KeyO","Open project…",()=>openProjectDlg()],
 ["Meta+Slash","Show key commands",()=>showKeys()],
 ];
 const KMAP=new Map();KEYS.forEach(k=>{if(k.length>1)KMAP.set((k[3]?"F:":"")+k[0],k)});
@@ -434,7 +436,7 @@ function showKeys(){let h=`<div class="keys">`;KEYS.forEach(k=>{h+=k.length===1?
 
 // ===================== menus =====================
 const MENUS={
-File:[["New Session…",()=>newSessionDlg()],["Open Session (.zip)…",()=>$("sessIn").click(),"Meta+KeyO"],"-",["Save",()=>saveNow(true),"Meta+KeyS"],["Save Copy (.zip)…",()=>saveSessionZip(),"Shift+Meta+KeyS"],["Rename Session…",()=>renameSession()],"-",
+File:[["New Project…",()=>newSessionDlg()],["Open Project…",()=>openProjectDlg(),"Meta+KeyO"],"-",["Save",()=>saveNow(true),"Meta+KeyS"],["Save Project to iCloud…",()=>saveProjectICloud(),"Shift+Meta+KeyS"],["Rename Project…",()=>renameSession()],"-",["iCloud Outbox…",()=>outboxDlg(false)],["Link KJD Edit Folder…",()=>linkFolder()],"-",
   ["Import Audio…",()=>$("fileIn").click(),"Shift+Meta+KeyI"],["Bounce Mix…",()=>bounceDlg(),"Alt+Meta+KeyB"],["Export Clips as Files…",()=>exportClips(),"Shift+Meta+KeyK"]],
 Edit:[["Undo",()=>undo(),"Meta+KeyZ"],["Redo",()=>redo(),"Shift+Meta+KeyZ"],"-",["Cut",()=>CMD.cut(),"Meta+KeyX"],["Copy",()=>CMD.copy(),"Meta+KeyC"],["Paste",()=>CMD.paste(),"Meta+KeyV"],["Clear",()=>CMD.clear(),"Meta+KeyB"],"-",
   ["Select All",()=>CMD.selectAll(),"Meta+KeyA"],["Duplicate",()=>CMD.duplicate(),"Meta+KeyD"],["Repeat…",()=>CMD.repeat(),"Alt+KeyR"],"-",["Separate Clip",()=>CMD.separate(),"Meta+KeyE"],["Heal Separation",()=>CMD.heal(),"Meta+KeyH"],
@@ -800,17 +802,54 @@ async function offer(filename,blob){
   if(!dl){try{if(window.claude&&window.claude.use)dl=await window.claude.use("downloads")}catch(e){}}
   if(dl){try{await dl.save({filename,data:blob});msg("Saved "+filename);return}catch(err){if(err&&err.code==="declined"){msg("Save cancelled");return}}}
   try{const u=URL.createObjectURL(blob);const a=document.createElement("a");a.href=u;a.download=filename;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),30000);msg("Saved "+filename)}catch(e){msg("Downloads aren't available in this view")}}
-async function deliver(files,zipName){ // artifact view: one .zip; installed app/web: plain files via the share sheet
-  if(!dl){try{if(window.claude&&window.claude.use)dl=await window.claude.use("downloads")}catch(e){}}
-  if(dl)return offer(zipName,files.length===1&&files[0].name.endsWith(".zip")?new Blob([files[0].data]):zip(files));
-  const fl=files.map(f=>new File([f.data],f.name.split("/").pop(),{type:/\.zip$/.test(f.name)?"application/zip":"audio/wav"}));
-  const mb=(fl.reduce((a,f)=>a+f.size,0)/1048576).toFixed(1);
-  const share=!!(navigator.canShare&&navigator.canShare({files:fl}));
-  const r=await dialog("Export Ready",`<p>${fl.length===1?esc(fl[0].name):fl.length+" files"} · ${mb} MB</p><p>${share?"Tap Save, choose <b>Save to Files</b>, then pick your iCloud Drive folder (e.g. KJD Exports). Files keeps that folder for next time.":"Tap Save to download."}</p>`,["Cancel","Save"]);
-  if(r!=="Save")return msg("Export cancelled");
-  if(share){try{await navigator.share({files:fl});msg("Exported "+(fl.length===1?fl[0].name:fl.length+" files"))}catch(e){msg(e&&e.name==="AbortError"?"Export cancelled":"Couldn't open the share sheet")}return}
-  fl.forEach((f,i)=>setTimeout(()=>{const u=URL.createObjectURL(f);const a=document.createElement("a");a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000)},i*400));msg("Exported "+fl.length+" file(s)")}
+const inArtifact=()=>!!(window.claude&&window.claude.use);
+async function deliver(files,zipName){ // claude.ai view: one .zip download; installed app: iCloud outbox
+  if(inArtifact()){if(!dl){try{dl=await window.claude.use("downloads")}catch(e){}}if(dl)return offer(zipName,files.length===1&&files[0].name.endsWith(".zip")?new Blob([files[0].data]):zip(files))}
+  return enqueue(files,"Exports",true)}
+async function shareNow(items){const fl=items.map(i=>new File([i.data],i.name,{type:i.data.type||"application/octet-stream"}));
+  if(navigator.canShare&&navigator.canShare({files:fl})){try{await navigator.share({files:fl});msg(`Saved ${fl.length} file${fl.length>1?"s":""}`);return true}catch(e){msg(e&&e.name==="AbortError"?"Not saved — still in the iCloud Outbox":"Couldn't open the share sheet");return false}}
+  fl.forEach((f,i)=>setTimeout(()=>{const u=URL.createObjectURL(f);const a=document.createElement("a");a.href=u;a.download=f.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),60000)},i*400));return true}
 const safe=s=>String(s).replace(/[\\/:*?"<>|]+/g,"_").trim()||"untitled";
+
+// ===================== iCloud outbox =====================
+// Exports and project copies land in a local queue first (survives offline and app restarts), then go to
+// iCloud Drive › KJD Edit › <Project>/ — written automatically where the browser allows folder access, else via Save to Files.
+let dirH=null;
+const canDir=()=>typeof window.showDirectoryPicker==="function";
+async function outboxAll(){if(!idb)return [];try{return await idbReq(store("outbox","readonly").getAll())}catch(e){return []}}
+const obDel=id=>idbReq(store("outbox","readwrite").delete(id));
+async function updOutbox(){const n=(await outboxAll()).length;const el=$("obTxt");if(!el)return;el.textContent=n?`☁︎ ${n} queued`:(dirH?"☁︎ linked":"☁︎ iCloud");el.classList.toggle("q",n>0)}
+async function enqueue(files,sub,prompt){const proj=safe(S.name);
+  const items=files.map(f=>({id:uid(),project:proj,sub,name:f.name.split("/").pop(),data:new Blob([f.data],{type:/\.zip$/.test(f.name)?"application/zip":"audio/wav"}),created:Date.now()}));
+  if(!idb)return shareNow(items);
+  if(!sub)for(const o of (await outboxAll()).filter(o=>!o.sub&&o.project===proj))await obDel(o.id); // newest project copy only
+  for(const it of items)await idbReq(store("outbox","readwrite").put(it,it.id));
+  await updOutbox();return flush(prompt)}
+async function writeToDir(items,ask){if(!dirH)return false;
+  try{let p=await dirH.queryPermission({mode:"readwrite"});if(p!=="granted"&&ask)p=await dirH.requestPermission({mode:"readwrite"});if(p!=="granted")return false;
+    for(const it of items){let d=await dirH.getDirectoryHandle(it.project,{create:true});if(it.sub)d=await d.getDirectoryHandle(it.sub,{create:true});
+      const fh=await d.getFileHandle(it.name,{create:true});const w=await fh.createWritable();await w.write(it.data);await w.close();await obDel(it.id)}
+    await updOutbox();msg(`Saved ${items.length} file${items.length>1?"s":""} to ${dirH.name} › ${items[0].project}`);return true}catch(e){msg("Couldn't write to the linked folder — files stay in the Outbox");return false}}
+async function flush(prompt){const items=await outboxAll();if(!items.length)return;
+  if(dirH&&await writeToDir(items,false))return;
+  if(!navigator.onLine){msg(`Offline — ${items.length} file${items.length>1?"s":""} queued for iCloud`);return}
+  if(prompt)return outboxDlg(true)}
+function groups(items){const m=new Map();items.sort((a,b)=>a.created-b.created).forEach(i=>{const k=i.project+(i.sub?" › "+i.sub:"");if(!m.has(k))m.set(k,[]);m.get(k).push(i)});return [...m.entries()]}
+async function outboxDlg(fresh,title){const items=await outboxAll();
+  if(!items.length)return dialog("iCloud Outbox",`<p>Nothing waiting. Exports and project saves land here first, then go to <b>iCloud Drive › KJD Edit › <i>Project</i></b>.</p>${canDir()?`<p>${dirH?"Folder “"+esc(dirH.name)+"” is linked — files are written there automatically.":"This browser can link the KJD Edit folder so saves happen automatically."}</p>`:""}`,canDir()?["Close","Link Folder…"]:["Close"]).then(r=>{if(r==="Link Folder…")linkFolder()});
+  const G=groups(items);
+  const body=G.map(([k,its],i)=>`<div class="ob"><div><b>KJD Edit › ${esc(k)}</b><span>${its.map(x=>esc(x.name)).join(", ")} · ${(its.reduce((a,x)=>a+x.data.size,0)/1048576).toFixed(1)} MB</span></div><button data-r="g${i}" class="primary">Save</button></div>`).join("");
+  const r=await dialog(title||(fresh?"Save to iCloud":"iCloud Outbox"),`${!navigator.onLine?`<p><b>Offline.</b> Files stay queued. You can still save them now — iCloud Drive uploads them when you're back online.</p>`:""}${body}
+   <p>Tap <b>Save</b> › <b>Save to Files</b> › iCloud Drive › <b>KJD Edit</b> › the folder shown (tap the folder-plus icon to create it the first time). Files remembers your last folder.</p>`,["Clear Queue","Later"]);
+  if(r==="Clear Queue"){const c=await dialog("Clear Queue","<p>Remove all queued files without saving them?</p>",["Cancel","Remove"]);if(c==="Remove"){for(const it of items)await obDel(it.id);updOutbox()}return}
+  const m=/^g(\d+)$/.exec(r||"");if(!m)return;const its=G[+m[1]][1];
+  if(dirH){if(await writeToDir(its,true))return}
+  if(await shareNow(its)){for(const it of its)await obDel(it.id);await updOutbox();if((await outboxAll()).length)setTimeout(()=>outboxDlg(false),350)}}
+async function linkFolder(){if(!canDir())return msg("This browser can't link folders — use the Outbox");
+  try{const h=await window.showDirectoryPicker({id:"kjd-edit",mode:"readwrite"});dirH=h;try{await idbReq(store("meta","readwrite").put(h,"dir"))}catch(e){}
+    msg("Linked “"+h.name+"” — exports and project saves are written there automatically");await updOutbox();flush(false)}catch(e){}}
+window.addEventListener("online",async()=>{const n=(await outboxAll()).length;if(n){msg("Back online");if(dirH)flush(false);else outboxDlg(true,"Back online — save queued files")}});
+window.addEventListener("offline",()=>msg("Offline — exports will queue for iCloud"));
 
 // ===================== bounce / export =====================
 async function renderRange(s0,s1,onlyClips,chans){const sr=SRr();const len=Math.max(1,Math.ceil((s1-s0)*sr));const oc=new OfflineAudioContext(chans||2,len,sr);
@@ -827,37 +866,63 @@ function exportClips(){const cl=[];selTracks().forEach(t=>clipsIn(t).forEach(c=>
     for(const c of cl){const b=bufs.get(c.buf);if(!b)continue;const out=await renderRange(c.start,cEnd(c),[c],b.buf.numberOfChannels);let nm=safe(c.name);used[nm]=(used[nm]||0)+1;if(used[nm]>1)nm+=`_${used[nm]}`;files.push({name:nm+".wav",data:wav(out,bits)})}
     deliver(files,safe(S.name)+" Clips.zip")})}
 
-// ===================== sessions =====================
-let idb=null;
-function openDB(){return new Promise(res=>{try{const r=indexedDB.open("kjd-edit",1);r.onupgradeneeded=()=>{r.result.createObjectStore("meta");r.result.createObjectStore("audio")};r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)}catch(e){res(null)}})}
+// ===================== projects (autosave on this iPad + iCloud copies) =====================
+let idb=null,projDirty=true;
+function openDB(){return new Promise(res=>{try{const r=indexedDB.open("kjd-edit",2);r.onupgradeneeded=()=>{const d=r.result;["meta","audio","outbox"].forEach(n=>{if(!d.objectStoreNames.contains(n))d.createObjectStore(n)})};r.onsuccess=()=>res(r.result);r.onerror=()=>res(null)}catch(e){res(null)}})}
 const store=(st,m)=>idb.transaction(st,m).objectStore(st);
 const idbReq=r=>new Promise((res,rej)=>{r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error)});
-let saveTimer=null;function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveNow(false),2500)}
-async function saveNow(manual){if(!idb){if(manual)msg("This browser can't keep sessions — use File › Save Copy");return}
-  try{const used=new Set();S.tracks.forEach(t=>t.clips.forEach(c=>used.add(c.buf)));
+const ensureId=()=>{if(!S.id)S.id=uid()};
+const bitsOf=b=>{const m=/(\d+)-bit/.exec(b.info||"");return m&&+m[1]<=24?24:"32f"};
+let saveTimer=null;function scheduleSave(){projDirty=true;clearTimeout(saveTimer);saveTimer=setTimeout(()=>saveNow(false),2500)}
+async function saveNow(manual){if(!idb){if(manual)saveProjectICloud();return}
+  try{ensureId();const used=new Set();S.tracks.forEach(t=>t.clips.forEach(c=>used.add(c.buf)));
     for(const [id,b] of bufs){if(!used.has(id)||b.saved)continue;const chs=[];for(let c=0;c<b.buf.numberOfChannels;c++)chs.push(b.buf.getChannelData(c));
       await idbReq(store("audio","readwrite").put({name:b.name,sr:b.buf.sampleRate,chs,info:b.info},id));b.saved=true}
-    await idbReq(store("meta","readwrite").put({S,sel,view:{x0:view.x0,pps:view.pps,y0:view.y0},mode,tool,gridV,nudgeV,xShape,focusKeys,fmt,r2},"session"));
-    dirty=false;$("saveTxt").textContent="Saved "+new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});if(manual)msg("Session saved on this iPad")}catch(e){$("saveTxt").textContent="Autosave failed";if(manual)msg("Save failed — use File › Save Copy")}}
-async function restore(){idb=await openDB();if(!idb)return;try{const m=await idbReq(store("meta","readonly").get("session"));if(!m)return;
-    const ids=new Set();m.S.tracks.forEach(t=>t.clips.forEach(c=>ids.add(c.buf)));
-    for(const id of ids){const a=await idbReq(store("audio","readonly").get(id));if(!a)continue;const ab=new AudioBuffer({numberOfChannels:a.chs.length,length:a.chs[0].length,sampleRate:a.sr});a.chs.forEach((d,i)=>ab.copyToChannel(d,i));regBuf(id,a.name,ab,a.info);bufs.get(id).saved=true}
-    S=m.S;if(!S.sr)S.sr=48000;sel=m.sel;Object.assign(view,m.view||{});mode=m.mode||mode;tool=m.tool||tool;gridV=m.gridV||gridV;nudgeV=m.nudgeV||nudgeV;xShape=m.xShape||xShape;focusKeys=m.focusKeys!==false;fmt=m.fmt||0;r2=m.r2===undefined?1:m.r2;
-    renderHeads();ui();updRate();draw();msg("Restored “"+S.name+"”");$("saveTxt").textContent="Saved"}catch(e){msg("Couldn't restore last session")}}
-async function saveSessionZip(){const files=[];const used=new Set();S.tracks.forEach(t=>t.clips.forEach(c=>used.add(c.buf)));const names={};
-  for(const id of used){const b=bufs.get(id);if(!b)continue;files.push({name:`Audio Files/${id}.wav`,data:wav(b.buf,"32f")});names[id]=b.name}
-  files.unshift({name:"session.json",data:new TextEncoder().encode(JSON.stringify({app:"KJD Edit",v:2,S,names,sr:SRr()},null,1))});const zb=new Uint8Array(await zip(files).arrayBuffer());deliver([{name:safe(S.name)+".zip",data:zb}],safe(S.name)+".zip")}
+    await idbReq(store("meta","readwrite").put({S,sel,view:{x0:view.x0,pps:view.pps,y0:view.y0},mode,tool,gridV,nudgeV,xShape,focusKeys,fmt,r2,updated:Date.now()},"p:"+S.id));
+    await idbReq(store("meta","readwrite").put(S.id,"last"));
+    dirty=false;$("saveTxt").textContent="Autosaved "+new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"});
+    if(manual){if(inArtifact()){msg("Project saved on this device");return}if(projDirty&&S.tracks.some(t=>t.clips.length)){await queueProject(false);msg(dirH?"Saved — project copy written to iCloud":"Saved — project copy queued for iCloud (☁︎ menu)")}else msg("Saved")}
+  }catch(e){$("saveTxt").textContent="Autosave failed";if(manual)msg("Save failed — use File › Save Project to iCloud")}}
+async function projectZip(){ensureId();const files=[];const used=new Set();S.tracks.forEach(t=>t.clips.forEach(c=>used.add(c.buf)));const names={},infos={};
+  for(const id of used){const b=bufs.get(id);if(!b)continue;files.push({name:`Audio Files/${id}.wav`,data:wav(b.buf,bitsOf(b))});names[id]=b.name;infos[id]=b.info}
+  files.unshift({name:"session.json",data:new TextEncoder().encode(JSON.stringify({app:"KJD Edit",v:3,S,names,infos,sr:SRr(),saved:new Date().toISOString()},null,1))});
+  return new Uint8Array(await zip(files).arrayBuffer())}
+async function queueProject(prompt){msg("Preparing project copy…");const zb=await projectZip();projDirty=false;return enqueue([{name:safe(S.name)+".kjdedit.zip",data:zb}],"",prompt)}
+async function saveProjectICloud(){if(!need(S.tracks.length,"Nothing to save yet"))return;await saveNow(false);
+  if(inArtifact()){const zb=await projectZip();return deliver([{name:safe(S.name)+".kjdedit.zip",data:zb}],safe(S.name)+".kjdedit.zip")}
+  return queueProject(true)}
+async function loadMeta(m){bufs.clear();const ids=new Set();m.S.tracks.forEach(t=>t.clips.forEach(c=>ids.add(c.buf)));
+  for(const id of ids){const a=await idbReq(store("audio","readonly").get(id));if(!a)continue;const ab=new AudioBuffer({numberOfChannels:a.chs.length,length:a.chs[0].length,sampleRate:a.sr});a.chs.forEach((d,i)=>ab.copyToChannel(d,i));regBuf(id,a.name,ab,a.info);bufs.get(id).saved=true}
+  S=m.S;if(!S.sr)S.sr=48000;ensureId();sel=m.sel||{t0:0,t1:0,tr:[]};Object.assign(view,m.view||{});mode=m.mode||mode;tool=m.tool||tool;gridV=m.gridV||gridV;nudgeV=m.nudgeV||nudgeV;xShape=m.xShape||xShape;focusKeys=m.focusKeys!==false;fmt=m.fmt||0;r2=m.r2===undefined?1:m.r2;
+  undoS=[];redoS=[];projDirty=false;if(ctx&&ctx.sampleRate!==S.sr&&!playing){try{ctx.close()}catch(e){}ctx=null}renderHeads();ui();updRate();draw();$("saveTxt").textContent="Autosaved"}
+async function restore(){idb=await openDB();if(!idb)return;
+  try{dirH=await idbReq(store("meta","readonly").get("dir"))||null}catch(e){dirH=null}updOutbox();
+  try{let id=await idbReq(store("meta","readonly").get("last"));let m=id?await idbReq(store("meta","readonly").get("p:"+id)):null;
+    if(!m){const old=await idbReq(store("meta","readonly").get("session"));if(old){old.S.id=old.S.id||uid();m=old;await idbReq(store("meta","readwrite").put(old,"p:"+old.S.id));await idbReq(store("meta","readwrite").put(old.S.id,"last"));await idbReq(store("meta","readwrite").delete("session"))}}
+    if(!m)return;await loadMeta(m);msg("Restored “"+S.name+"”")}catch(e){msg("Couldn't restore last project")}}
+async function listProjects(){const out=[];await new Promise(res=>{const rq=store("meta","readonly").openCursor();rq.onsuccess=()=>{const c=rq.result;if(!c)return res();if(String(c.key).startsWith("p:"))out.push({id:c.key.slice(2),name:c.value.S.name,updated:c.value.updated||0,sr:c.value.S.sr,n:c.value.S.tracks.reduce((a,t)=>a+t.clips.length,0)});c.continue()};rq.onerror=()=>res()});return out.sort((a,b)=>b.updated-a.updated)}
+async function switchTo(id){if(playing)stop();await saveNow(false);const m=await idbReq(store("meta","readonly").get("p:"+id));if(!m)return msg("Project not found");await loadMeta(m);await idbReq(store("meta","readwrite").put(S.id,"last"));CMD.zoomFit();msg("Opened “"+S.name+"”")}
+async function deleteProject(id){const all=await listProjects();const keep=new Set();for(const p of all){if(p.id===id)continue;const m=await idbReq(store("meta","readonly").get("p:"+p.id));m.S.tracks.forEach(t=>t.clips.forEach(c=>keep.add(c.buf)))}
+  const m=await idbReq(store("meta","readonly").get("p:"+id));if(m)for(const t of m.S.tracks)for(const c of t.clips)if(!keep.has(c.buf))await idbReq(store("audio","readwrite").delete(c.buf));
+  await idbReq(store("meta","readwrite").delete("p:"+id))}
+async function openProjectDlg(){const ps=idb?await listProjects():[];
+  const rows=ps.map(p=>`<div class="ob"><div><b>${esc(p.name)}${p.id===S.id?" (open)":""}</b><span>${p.sr?p.sr/1000+" kHz · ":""}${p.n} clip${p.n===1?"":"s"} · ${p.updated?new Date(p.updated).toLocaleString([],{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):""}</span></div>${p.id===S.id?"":`<button data-r="del:${p.id}">Remove</button><button data-r="open:${p.id}" class="primary">Open</button>`}</div>`).join("")||"<p>No projects on this device yet.</p>";
+  const r=await dialog("Open Project",`<p>On this iPad (autosaved):</p>${rows}<p>Or open a project copy (<b>.kjdedit.zip</b>) from <b>iCloud Drive › KJD Edit</b>.</p>`,["Cancel","From iCloud Drive…"]);
+  if(r==="From iCloud Drive…")return $("sessIn").click();
+  if(r&&r.startsWith("open:"))return switchTo(r.slice(5));
+  if(r&&r.startsWith("del:")){const id=r.slice(4),p=ps.find(x=>x.id===id);const c=await dialog("Remove Project",`<p>Remove “${esc(p.name)}” from this iPad? Copies already saved to iCloud are not touched.</p>`,["Cancel","Remove"]);if(c==="Remove"){await deleteProject(id);msg("Removed “"+p.name+"”")}return openProjectDlg()}}
 async function openSessionZip(file){try{const z=unzip(await file.arrayBuffer());const j=JSON.parse(new TextDecoder().decode(z["session.json"]));if(j.app!=="KJD Edit")throw 0;
-    if(playing)stop();bufs.clear();S=j.S;if(!S.sr)S.sr=j.sr||48000;
-    for(const id in j.names){const d=z[`Audio Files/${id}.wav`];if(!d)continue;const r=parseWav(d.slice().buffer);if(r)regBuf(id,j.names[id],r.buf)}
-    sel={t0:0,t1:0,tr:S.tracks[0]?[S.tracks[0].id]:[]};undoS=[];redoS=[];ensureCtx();renderHeads();CMD.zoomFit();changed("Opened “"+S.name+"”")}catch(e){msg("That isn't a KJD Edit session .zip")}}
+    if(playing)stop();await saveNow(false);bufs.clear();S=j.S;if(!S.sr)S.sr=j.sr||48000;ensureId();
+    for(const id in j.names){const d=z[`Audio Files/${id}.wav`];if(!d)continue;const r=parseWav(d.slice().buffer);if(r)regBuf(id,j.names[id],r.buf,(j.infos||{})[id]||"")}
+    sel={t0:0,t1:0,tr:S.tracks[0]?[S.tracks[0].id]:[]};undoS=[];redoS=[];ensureCtx();renderHeads();CMD.zoomFit();changed("Opened “"+S.name+"”");projDirty=false;saveNow(false)}catch(e){msg("That isn't a KJD Edit project file")}}
 $("sessIn").onchange=e=>{if(e.target.files[0])openSessionZip(e.target.files[0]);e.target.value=""};
-function renameSession(){dialog("Session Name",`<div class="f">Name<input type="text" id="dNm" value="${esc(S.name)}"></div>`,["Cancel","OK"]).then(r=>{if(r!=="OK")return;S.name=$("dNm").value.trim()||S.name;changed("Session renamed")})}
-function newSessionDlg(){dialog("New Session",`<div class="f">Name<input type="text" id="dNm" value="Untitled Session"></div>
+function renameSession(){dialog("Project Name",`<div class="f">Name (also the iCloud folder name)<input type="text" id="dNm" value="${esc(S.name)}"></div>`,["Cancel","OK"]).then(r=>{if(r!=="OK")return;S.name=$("dNm").value.trim()||S.name;ui();changed("Project renamed")})}
+function newSessionDlg(){dialog("New Project",`<div class="f">Name (also the iCloud folder name)<input type="text" id="dNm" value="Untitled Project"></div>
   <div class="f">Sample rate<select id="dSr"><option value="auto">Match first imported file</option>${RATES.map(r=>`<option value="${r}">${r/1000} kHz</option>`).join("")}</select></div>
-  <p>Files at other rates are converted to the session rate on import. The current timeline is cleared — save a copy first if you need it.</p>`,["Cancel","Create"]).then(r=>{if(r!=="Create")return;
-  if(playing)stop();const v=$("dSr").value;S={name:$("dNm").value.trim()||"Untitled Session",sr:v==="auto"?null:+v,tracks:[]};bufs.clear();sel={t0:0,t1:0,tr:[]};undoS=[];redoS=[];view={x0:0,pps:40,y0:0};
-  if(S.sr&&ctx){try{ctx.close()}catch(e){}ctx=null}updRate();renderHeads();changed("New session · "+(S.sr?S.sr/1000+" kHz":"rate set by first import"))})}
+  <p>The current project is autosaved first and stays in File › Open Project. Files at other rates are converted to the project rate on import.</p>`,["Cancel","Create"]).then(async r=>{if(r!=="Create")return;
+  if(playing)stop();const nm=$("dNm").value.trim()||"Untitled Project",v=$("dSr").value;await saveNow(false);
+  S={id:uid(),name:nm,sr:v==="auto"?null:+v,tracks:[]};bufs.clear();sel={t0:0,t1:0,tr:[]};undoS=[];redoS=[];view={x0:0,pps:40,y0:0};
+  if(S.sr&&ctx){try{ctx.close()}catch(e){}ctx=null}updRate();renderHeads();ui();changed("New project · "+(S.sr?S.sr/1000+" kHz":"rate set by first import"))})}
 function setFmt(f){fmt=f;$("ctrLab").textContent=FMTN[fmt];draw();scheduleSave()}
 
 // ===================== toolbar / touch bar =====================
@@ -870,6 +935,7 @@ $("playBtn").onclick=()=>{if(!playing)togglePlay()};$("stopBtn").onclick=()=>{if
 $("rewBtn").onclick=()=>CMD.locate(-1);$("ffBtn").onclick=()=>CMD.locate(1);
 $("loopBtn").onclick=()=>CMD.toggleLoop();$("followBtn").onclick=()=>CMD.toggleFollow();$("focusBtn").onclick=()=>CMD.toggleFocus();$("mixBtn").onclick=()=>CMD.toggleMix();
 $("halfBtn").onclick=()=>{if(playing)stop();togglePlay(0.5)};
+$("obTxt").onclick=e=>{e.stopPropagation();outboxDlg(false)};
 $("counter").onclick=()=>{setFmt((fmt+1)%3);msg("Main counter: "+FMTN[fmt])};
 $("ruler2Lab").onclick=()=>{r2=(r2+1)%3;$("ruler2Lab").textContent=["(off)","Samples","Timecode"][r2];draw();scheduleSave()};
 $("selb").onclick=e=>{const f=e.target.dataset.f;if(!f)return;const cur=f==="t0"?sel.t0:f==="t1"?sel.t1:sel.t1-sel.t0;
