@@ -73,7 +73,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
 #master div{width:6px;height:100%;background:#0c0c0c;border:1px solid #000;position:relative;overflow:hidden}
 #master div i{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(#ff3b30,#f2c53d 18%,#3fbf3f 40%);height:0}
 /* main */
-#main{display:grid;grid-template-columns:var(--tl,170px) 212px 1fr var(--cl,0px);min-height:0;position:relative}
+#main{display:grid;grid-template-columns:var(--tl,170px) var(--hw,212px) 1fr var(--cl,0px);min-height:0;position:relative}
 #main.notl{--tl:0px}#main.cl{--cl:210px}
 .side{background:#2b2b2b;border-right:1px solid #000;overflow:hidden;display:flex;flex-direction:column;min-height:0}
 #clipsList{border-right:0;border-left:1px solid #000}
@@ -91,7 +91,8 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
 #rulerLabs div{height:22px;display:flex;align-items:center;justify-content:space-between;padding:0 6px 0 8px;font-size:11px;color:#cfcfcf;border-bottom:1px solid #2a2a2a}
 #rulerLabs button{min-height:18px;font-size:10px;padding:0 5px}
 #headsIn{position:absolute;left:0;right:0}
-.hd{border-bottom:1px solid #111;display:grid;grid-template-columns:6px 1fr 10px;position:relative;overflow:hidden;background:var(--panel)}
+#main.insv{--hw:296px}
+.hd{border-bottom:1px solid #111;display:grid;grid-template-columns:6px 1fr auto 10px;position:relative;overflow:hidden;background:var(--panel)}
 .hd .cb{grid-row:1/9}
 .hd .body{padding:4px 5px 4px 6px;display:flex;flex-direction:column;gap:4px;min-width:0}
 .hd .row{display:flex;gap:3px;align-items:center}
@@ -102,7 +103,10 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
 .hd .io{display:flex;gap:4px;align-items:center;font:10px var(--mono);color:var(--dim)}
 .hd .io input[type=range]{flex:1;height:20px;accent-color:#bdbdbd}
 .hd .io .v{width:38px;text-align:right}
-.hd .meter{grid-column:3;background:#0c0c0c;border-left:1px solid #000;position:relative}
+.hd .insc{grid-column:3;width:84px;display:flex;flex-direction:column;gap:2px;padding:4px 4px 4px 5px;border-left:1px solid #2a2a2a;background:#333}
+.hd .insc button{min-height:17px;height:17px;min-width:0;padding:0 4px;font:10px var(--ui);text-align:left;border-radius:2px;background:#1e1e1e;color:#666;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hd .insc button.has{background:linear-gradient(#5f6e86,#46536a);color:#fff}.hd .insc button.byp{opacity:.5;text-decoration:line-through}
+.hd .meter{grid-column:4;background:#0c0c0c;border-left:1px solid #000;position:relative}
 .hd .meter i{position:absolute;bottom:0;left:1px;right:1px;background:linear-gradient(#ff3b30,#f2c53d 18%,#3fbf3f 40%);height:0}
 #focusBtn{position:absolute;right:4px;top:3px}
 #edit{position:relative;min-height:0;overflow:hidden;touch-action:none;background:var(--bg)}
@@ -175,7 +179,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
 .keys div{display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px solid #ffffff0d;break-inside:avoid}
 .keys kbd{font:11px var(--mono);color:#9fd3ff;white-space:nowrap}.keys .fk{color:var(--solo)}
 @media (max-width:1250px){#main{--tl:0px}#main.tlon{--tl:150px}.selb{display:none}}
-@media (max-width:900px){#main{grid-template-columns:var(--tl,0px) 150px 1fr var(--cl,0px)}.zoomb{display:none}}
+@media (max-width:900px){#main{--hw:150px}#main.insv{--hw:228px}.zoomb{display:none}}
 </style>
 </head>
 <body>
@@ -183,7 +187,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
   <div id="menubar">
     <span class="app">KJD Edit</span>
     <button class="mb" data-menu="File">File</button><button class="mb" data-menu="Edit">Edit</button><button class="mb" data-menu="View">View</button><button class="mb" data-menu="Track">Track</button><button class="mb" data-menu="Clip">Clip</button><button class="mb" data-menu="Window">Window</button>
-    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.6.1</span></div>
+    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.6.2</span></div>
   </div>
   <header id="tb">
     <div class="blk modes" id="modes" aria-label="Edit modes">
@@ -226,7 +230,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
     </div>
     <div class="blk" id="master" title="Master meter"><div><i></i></div><div><i></i></div></div>
   </header>
-  <div id="main" class="">
+  <div id="main" class="insv">
     <aside class="side" id="tracksList"><h5>Tracks <button id="tlNew" title="New track (⌘⇧N)">+ New</button></h5><div class="lst" id="tlL"></div></aside>
     <div id="heads">
       <div id="rulerLabs"><div>Min:Secs <button id="focusBtn" title="Commands Keyboard Focus (⌘⌥1)">a…z</button></div><div id="ruler2Lab">Samples</div></div>
@@ -265,7 +269,7 @@ const bufs=new Map();
 let view={x0:0,pps:40,y0:0};
 let mode="slip",tool="smart",focusKeys=true,gridV=1,nudgeV=0.01,xShape="eqp",loop=false,follow=false,fmt=0,r2=1,heightIx=1,half=false,mixOpen=false;
 const HEIGHTS=[48,116,160,240];
-let undoS=[],redoS=[],clipboard=null,dirty=true,lastStop=null;
+let undoS=[],redoS=[],clipboard=null,dirty=true,lastStop=null,insView=(()=>{try{return localStorage.getItem("kjd-insv")!=="0"}catch(e){return true}})();
 const uid=()=>Math.random().toString(36).slice(2,10);
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -391,6 +395,7 @@ spot(){const t=selTracks()[0];const c=t&&clipsIn(t)[0];if(!need(c,"Select a clip
 toggleMix(){mixOpen=!mixOpen;$("mix").classList.toggle("open",mixOpen);if(mixOpen)renderMix();ui();msg(mixOpen?"Mix window":"Edit window")},
 toggleTL(){const m=$("main");if(innerWidth<=1250)m.classList.toggle("tlon");else m.classList.toggle("notl");setTimeout(resize,0)},
 toggleCL(){$("main").classList.toggle("cl");setTimeout(resize,0)},
+toggleIns(){insView=!insView;$("main").classList.toggle("insv",insView);try{localStorage.setItem("kjd-insv",insView?"1":"0")}catch(e){}renderHeads();setTimeout(resize,0)},
 toggleBar(){$("cmds").classList.toggle("hide");setTimeout(resize,0)},
 };
 function removeSel(){const d=sel.t1-sel.t0;selTracks().forEach(t=>{clearRange(t,sel.t0,sel.t1);if(mode==="shuffle")ripple(t,sel.t1,-d)});if(mode==="shuffle")sel.t1=sel.t0}
@@ -479,7 +484,7 @@ Edit:[["Undo",()=>undo(),"Meta+KeyZ"],["Redo",()=>redo(),"Shift+Meta+KeyZ"],"-",
   ["Select All",()=>CMD.selectAll(),"Meta+KeyA"],["Duplicate",()=>CMD.duplicate(),"Meta+KeyD"],["Repeat…",()=>CMD.repeat(),"Alt+KeyR"],"-",["Separate Clip",()=>CMD.separate(),"Meta+KeyE"],["Heal Separation",()=>CMD.heal(),"Meta+KeyH"],
   ["Trim Clip to Selection",()=>CMD.trimToSel(),"Meta+KeyT"],["Trim Start to Insertion",()=>CMD.trimStart(),"F:KeyA"],["Trim End to Insertion",()=>CMD.trimEnd(),"F:KeyS"],["Insert Silence",()=>CMD.insertSilence(),"Shift+Meta+KeyE"],"-",
   ["Fades…",()=>CMD.fadesDlg(),"Meta+KeyF"],["Fade to Start",()=>CMD.fadeIn(),"F:KeyD"],["Fade to End",()=>CMD.fadeOut(),"F:KeyG"]],
-View:[["Tracks List",()=>CMD.toggleTL(),null,()=>tlShown()],["Clips List",()=>CMD.toggleCL(),null,()=>$("main").classList.contains("cl")],["Touch Command Bar",()=>CMD.toggleBar(),null,()=>!$("cmds").classList.contains("hide")],"-",
+View:[["Tracks List",()=>CMD.toggleTL(),null,()=>tlShown()],["Clips List",()=>CMD.toggleCL(),null,()=>$("main").classList.contains("cl")],["Inserts A–E (Edit window)",()=>CMD.toggleIns(),null,()=>insView],["Touch Command Bar",()=>CMD.toggleBar(),null,()=>!$("cmds").classList.contains("hide")],"-",
   ["Zoom In",()=>CMD.zoom(2),"Meta+BracketRight"],["Zoom Out",()=>CMD.zoom(.5),"Meta+BracketLeft"],["Zoom to Session",()=>CMD.zoomFit(),"Alt+KeyA"],["Zoom Toggle",()=>CMD.zoomToggle(),"F:KeyE"],"-",
   ["Playhead Stays Where Stopped",()=>CMD.toggleFollow(),"Ctrl+KeyN",()=>follow],"-",["Taller Tracks",()=>CMD.trackHeight(1),"Ctrl+ArrowUp"],["Shorter Tracks",()=>CMD.trackHeight(-1),"Ctrl+ArrowDown"],"-",["Counter: Min:Secs",()=>setFmt(0),null,()=>fmt===0],["Counter: Samples",()=>setFmt(1),null,()=>fmt===1],["Counter: Timecode (30)",()=>setFmt(2),null,()=>fmt===2]],
 Track:[["New…",()=>CMD.newTracks(),"Shift+Meta+KeyN"],["Delete…",()=>CMD.deleteTracks()],"-",["Mute Selected",()=>CMD.trackMS("mute"),"Shift+KeyM"],["Solo Selected",()=>CMD.trackMS("solo"),"Shift+KeyS"]],
@@ -893,6 +898,7 @@ function renderHeads(){
    ${t.h>=100?`<div class="io"><span>vol</span><input type="range" min="-60" max="12" step="0.5" value="${t.vol}" data-a="vol" aria-label="Volume"><span class="v">${volTxt(t.vol)}</span></div>
    <div class="io"><span>pan</span><input type="range" min="-1" max="1" step="0.01" value="${t.pan}" data-a="pan" aria-label="Pan"><span class="v">${panTxt(t.pan)}</span></div>`:""}
    ${t.h>=160?`<div class="row"><button data-a="color">Color</button><button data-a="rename">Name</button><button data-a="hide">Hide</button></div>`:""}</div>
+   ${insView?`<div class="insc">${[0,1,2,3,4].slice(0,Math.max(1,Math.floor((t.h-8)/19))).map(i=>{const f=(t.fx||[])[i];return `<button data-a="ins" data-i="${i}" class="${f?(f.on?"has":"has byp"):""}" title="Insert ${"ABCDE"[i]}">${f?FXDEF[f.type].name:"ABCDE"[i]}</button>`}).join("")}</div>`:""}
    <div class="meter"><i data-mid="${t.id}"></i></div><div class="rz" data-a="rz" title="Drag to resize track"></div></div>`).join("");
   renderLists();if(mixOpen)renderMix()}
 function renderLists(){
@@ -920,6 +926,7 @@ $("headsIn").addEventListener("click",e=>{if(window._hyBlock&&performance.now()-
   else if(a==="color"){snap();t.color=COLORS[(COLORS.indexOf(t.color)+1)%COLORS.length];renderHeads();changed("Track color")}
   else if(a==="rename")renameTrack(t);
   else if(a==="fx")openPlug(t.id);
+  else if(a==="ins"){const f=(t.fx||[])[+e.target.dataset.i];openPlug(t.id,f&&f.id);if(!f)setTimeout(()=>{const sl=$("plug").querySelector("select[data-pa='add']");if(sl)sl.focus()},60)}
   else if(a==="hide"){snap();t.hidden=true;sel.tr=sel.tr.filter(x=>x!==t.id);renderHeads();updateMix();changed("Hide "+t.name)}});
 let sliderSnap=false;
 $("headsIn").addEventListener("input",e=>{const hd=e.target.closest(".hd");const t=trk(hd.dataset.id);if(!sliderSnap){undoS.push(JSON.stringify({S,sel}));redoS=[];sliderSnap=true}
