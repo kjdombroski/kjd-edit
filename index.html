@@ -187,7 +187,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
   <div id="menubar">
     <span class="app">KJD Edit</span>
     <button class="mb" data-menu="File">File</button><button class="mb" data-menu="Edit">Edit</button><button class="mb" data-menu="View">View</button><button class="mb" data-menu="Track">Track</button><button class="mb" data-menu="Clip">Clip</button><button class="mb" data-menu="Window">Window</button>
-    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.6.6</span></div>
+    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.6.7</span></div>
   </div>
   <header id="tb">
     <div class="blk modes" id="modes" aria-label="Edit modes">
@@ -880,8 +880,9 @@ async function rxConnect(){if(rfb)return;const scr=$("rxScreen");scr.innerHTML="
     rfb=new RFB(scr,url,{credentials:{username:rxCfg.user||"",password:rxCfg.pass||""},wsProtocols:["binary"]});
     rfb.scaleViewport=true;rfb.resizeSession=false;rfb.showDotCursor=true;rfb.qualityLevel=7;rfb.compressionLevel=2;
     rfb.addEventListener("connect",()=>$("rxConn").textContent="Mac screen connected");
-    rfb.addEventListener("disconnect",e=>{rfb=null;$("rxConn").textContent=e.detail.clean?"Screen view closed":"Screen view lost — tap Reconnect"});
-    rfb.addEventListener("securityfailure",()=>{$("rxConn").textContent="Mac rejected the login — check File › RX Bridge Setup"});
+    let secFail=null,wasUp=false;rfb.addEventListener("connect",()=>{wasUp=true});
+    rfb.addEventListener("disconnect",e=>{rfb=null;if(secFail)return;$("rxConn").textContent=!wasUp?"Couldn't open the Mac screen — check Screen Sharing is on, then tap Reconnect":e.detail.clean?"Screen view closed":"Screen view lost — tap Reconnect"});
+    rfb.addEventListener("securityfailure",e=>{secFail=e.detail;$("rxConn").textContent="Mac rejected the login"+(e.detail&&e.detail.reason?" ("+e.detail.reason+")":"")+" — use your short Mac account name and password in File › RX Bridge Setup, then Reconnect"});
     rfb.addEventListener("credentialsrequired",()=>{dialog("Mac Login",`<div class="f">User name<input type="text" id="rxN2" value="${esc(rxCfg.user||"")}" autocapitalize="off"></div><div class="f">Password<input type="password" id="rxP2"></div>`,["Cancel","Connect"]).then(r=>{
       if(r!=="Connect"||!rfb)return;rxCfg.user=$("rxN2").value.trim();rxCfg.pass=$("rxP2").value;saveRxCfg();rfb.sendCredentials({username:rxCfg.user,password:rxCfg.pass})})});
     $("rxConn").textContent="Connecting to the Mac screen…"}catch(e){$("rxConn").textContent="Screen view unavailable: "+e.message}}
