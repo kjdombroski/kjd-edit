@@ -11,7 +11,7 @@ Every request needs the pairing token shown by the launcher.
 import asyncio, base64, glob, hashlib, json, os, re, secrets, shutil, subprocess, sys, time, uuid
 from urllib.parse import urlsplit, parse_qs, unquote
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 APP_NAME = "KJD RX Bridge"
 SUPPORT = os.path.expanduser(f"~/Library/Application Support/{APP_NAME}")
 WORK = os.path.expanduser("~/Music/KJD Edit RX")
@@ -226,6 +226,8 @@ async def handle(reader, writer):
             headers[k.strip().lower()] = v.strip()
         u = urlsplit(target)
         path, q = unquote(u.path), parse_qs(u.query)
+        if path.startswith("/api") or path == "/vnc":
+            log(method, path, "from", headers.get("origin", "-"))
         if method == "OPTIONS":
             return await send(writer, 204, b"", req_headers=headers)
         tok = headers.get("x-kjd-token") or (q.get("token") or [""])[0]
@@ -251,8 +253,8 @@ async def handle(reader, writer):
             body = await read_body(reader, headers)
             if body[:4] not in (b"RIFF", b"RF64"):
                 return await send(writer, 400, {"error": "send a WAV file"}, req_headers=headers)
-            name = safe(unquote(headers.get("x-kjd-name", "clip")))
-            proj = safe(unquote(headers.get("x-kjd-project", "KJD Edit")))
+            name = safe((q.get("name") or [unquote(headers.get("x-kjd-name", "clip"))])[0])
+            proj = safe((q.get("project") or [unquote(headers.get("x-kjd-project", "KJD Edit"))])[0])
             folder = os.path.join(WORK, proj)
             os.makedirs(folder, exist_ok=True)
             jid = uuid.uuid4().hex[:10]

@@ -187,7 +187,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
   <div id="menubar">
     <span class="app">KJD Edit</span>
     <button class="mb" data-menu="File">File</button><button class="mb" data-menu="Edit">Edit</button><button class="mb" data-menu="View">View</button><button class="mb" data-menu="Track">Track</button><button class="mb" data-menu="Clip">Clip</button><button class="mb" data-menu="Window">Window</button>
-    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.6.4</span></div>
+    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.6.5</span></div>
   </div>
   <header id="tb">
     <div class="blk modes" id="modes" aria-label="Edit modes">
@@ -839,7 +839,8 @@ function renderPlug(){const t=trk(plugT);if(!t){$("plug").classList.remove("open
 let rxCfg=(()=>{try{return JSON.parse(localStorage.getItem("kjd-rx")||"{}")}catch(e){return {}}})();
 const saveRxCfg=()=>{try{localStorage.setItem("kjd-rx",JSON.stringify(rxCfg))}catch(e){}};
 const rxBase=()=>(rxCfg.url||"").trim().replace(/\/+$/,"");
-async function rxFetch(path,opt={}){const r=await fetch(rxBase()+path,Object.assign({},opt,{headers:Object.assign({"X-KJD-Token":rxCfg.token||""},opt.headers||{})}));
+// "simple" requests only (token + names in the query, no custom headers) so Safari never needs a CORS preflight
+async function rxFetch(path,opt={}){const u=rxBase()+path+(path.includes("?")?"&":"?")+"token="+encodeURIComponent(rxCfg.token||"");const r=await fetch(u,Object.assign({cache:"no-store"},opt));
   if(!r.ok){let m="HTTP "+r.status;try{m=(await r.json()).error||m}catch(e){}throw new Error(m)}return r}
 function rxSetup(){if(inArtifact())return msg("RX works in the installed app: kjdombroski.github.io/kjd-edit");
   dialog("RX Bridge Setup",`<p>On the Mac, open <b>KJD RX Bridge</b> and tap <b>Copy Pairing Code</b>, then paste it here (Universal Clipboard).</p>
@@ -848,16 +849,19 @@ function rxSetup(){if(inArtifact())return msg("RX works in the installed app: kj
    <div class="f">Mac password<input type="password" id="rxP" value="${esc(rxCfg.pass||"")}"></div>
    <p>The password stays on this iPad and is only sent to your Mac's Screen Sharing.</p>
    <div style="display:flex;gap:8px;align-items:center"><button id="rxTest" type="button">Test Connection</button><span id="rxTestOut" style="color:var(--dim);font-size:12px"></span></div>`,["Cancel","Save"]).then(r=>{if(r==="Save"){readRxForm();msg("RX Bridge settings saved")}});
-  setTimeout(()=>{const b=$("rxTest");if(b)b.onclick=async()=>{readRxForm();$("rxTestOut").textContent="Checking…";try{const j=await (await rxFetch("/api/ping")).json();
-    $("rxTestOut").textContent=`Connected to ${j.host} · RX 12 ${j.rx?"found":"NOT found"} · Screen Sharing ${j.screen_sharing?"on":"OFF"}`}catch(e){$("rxTestOut").textContent="No connection: "+e.message}}},50)}
-function readRxForm(){let u=$("rxU").value.trim();const i=u.indexOf("#");if(i>=0){rxCfg.token=u.slice(i+1).trim();u=u.slice(0,i)}if(u&&!/^https?:\/\//.test(u))u="https://"+u;rxCfg.url=u;rxCfg.user=$("rxN").value.trim();rxCfg.pass=$("rxP").value;saveRxCfg()}
+  setTimeout(()=>{const b=$("rxTest");if(b)b.onclick=async()=>{readRxForm();$("rxTestOut").textContent="Checking…";
+    let reach=true;try{await fetch(rxBase()+"/",{mode:"no-cors",cache:"no-store"})}catch(e){reach=false}
+    if(!reach){$("rxTestOut").textContent="Can't reach the Mac — check Tailscale is connected on both devices and the address is right";return}
+    try{const j=await (await rxFetch("/api/ping")).json();
+    $("rxTestOut").textContent=`Connected to ${j.host} · RX 12 ${j.rx?"found":"NOT found"} · Screen Sharing ${j.screen_sharing?"on":"OFF"}`}catch(e){$("rxTestOut").textContent=(/401|token/i.test(e.message)?"Reached the Mac, but the pairing code is wrong — copy it again":"Reached the Mac, but its reply was blocked ("+e.message+") — tell Claude")}}},50)}
+function readRxForm(){let u=$("rxU").value.replace(/[\u200B-\u200D\uFEFF\s]+/g,"");const i=u.indexOf("#");if(i>=0){rxCfg.token=u.slice(i+1).trim();u=u.slice(0,i)}if(u&&!/^https?:\/\//.test(u))u="https://"+u;rxCfg.url=u;rxCfg.user=$("rxN").value.trim();rxCfg.pass=$("rxP").value;saveRxCfg()}
 let rxJob=null,rxTimer=null,rfb=null;
 async function sendToRX(){if(inArtifact())return msg("RX works in the installed app: kjdombroski.github.io/kjd-edit");
   const t=selTracks()[0],c=t&&clipsIn(t)[0];if(!need(c,"Select a clip to send to RX"))return;if(!rxBase()||!rxCfg.token)return rxSetup();
   const b=bufs.get(c.buf);if(!b)return;const sr=b.buf.sampleRate,s0=Math.round(c.offset*sr),n=Math.max(1,Math.round(c.len*sr));
   const out=new AudioBuffer({numberOfChannels:b.buf.numberOfChannels,length:n,sampleRate:sr});for(let ch=0;ch<out.numberOfChannels;ch++)out.copyToChannel(b.buf.getChannelData(ch).subarray(s0,s0+n),ch);
   msg("Sending “"+c.name+"” to RX 12…");
-  try{const r=await rxFetch("/api/jobs",{method:"POST",body:new Blob([wav(out,"32f")],{type:"audio/wav"}),headers:{"Content-Type":"audio/wav","X-KJD-Name":encodeURIComponent(c.name),"X-KJD-Project":encodeURIComponent(S.name)}});
+  try{const r=await rxFetch("/api/jobs?name="+encodeURIComponent(c.name)+"&project="+encodeURIComponent(S.name),{method:"POST",body:new Blob([wav(out,"32f")])});
     const j=await r.json();rxJob={id:j.id,cid:c.id,tid:t.id,name:c.name.replace(/-RX\d*$/,""),applied:0};openRxWin();rxStatus("Open in RX — process, then press ⌘S in RX");
     clearInterval(rxTimer);rxTimer=setInterval(rxPoll,1000)}catch(e){msg("RX Bridge: "+e.message+" — check File › RX Bridge Setup")}}
 async function rxPoll(){if(!rxJob)return;try{const j=await (await rxFetch("/api/jobs/"+rxJob.id)).json();if(j.version>rxJob.applied){rxJob.applied=j.version;await rxApply(j.version)}}catch(e){rxStatus("Lost the bridge: "+e.message)}}
