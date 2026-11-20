@@ -130,7 +130,10 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
 .strip .vol{font:11px var(--mono);text-align:center;background:#1b1b1b;border:1px solid #000;border-radius:2px;padding:3px}
 .strip .nm{font-weight:bold;text-align:center;background:#1b1b1b;border:1px solid #000;border-radius:2px;padding:5px 3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-bottom:4px solid}
 .strip.sel .nm{background:#e2e2e2;color:#111}
-.hd .rz{position:absolute;left:0;right:0;bottom:0;height:10px;cursor:ns-resize;touch-action:none;z-index:2}
+.hd .rz{position:absolute;left:0;right:0;bottom:0;height:12px;cursor:ns-resize;touch-action:none;z-index:2}
+.hd .rz::after{content:"";position:absolute;left:50%;bottom:3px;width:30px;height:3px;margin-left:-15px;border-radius:2px;background:#ffffff2e}
+@media (pointer:coarse){.hd .rz{height:22px}}
+#heads{touch-action:none}#heads input{touch-action:auto}
 .hd .rz:hover,.hd .rz.act{background:linear-gradient(transparent 6px,var(--blue) 6px)}
 .hd button.fxb{font-size:10px;min-width:30px}.hd button.fxb.has{background:linear-gradient(#5f6e86,#46536a);color:#fff}
 .strip .ins{display:flex;flex-direction:column;gap:2px}
@@ -187,7 +190,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
   <div id="menubar">
     <span class="app">KJD Edit</span>
     <button class="mb" data-menu="File">File</button><button class="mb" data-menu="Edit">Edit</button><button class="mb" data-menu="View">View</button><button class="mb" data-menu="Track">Track</button><button class="mb" data-menu="Clip">Clip</button><button class="mb" data-menu="Window">Window</button>
-    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.7.0</span></div>
+    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.7.1</span></div>
   </div>
   <header id="tb">
     <div class="blk modes" id="modes" aria-label="Edit modes">
@@ -701,10 +704,10 @@ function hit(px,py){const t=view.x0+px/view.pps;const r=rowTops().find(r=>py>=r.
   return {t,row:r,clip:c,zone}}
 function rowAt(py){const rows=rowTops();let r=rows.find(r=>py>=r.y&&py<r.y+r.h);if(!r)r=py<RULER_H?rows[0]:rows[rows.length-1];return r}
 ed.addEventListener("pointerdown",e=>{
-  if(mixOpen)return;ensureCtx();ed.setPointerCapture(e.pointerId);const rect=ed.getBoundingClientRect();const px=e.clientX-rect.left,py=e.clientY-rect.top;ptrs.set(e.pointerId,{x:px,y:py});
-  if(ptrs.size===2){if(drag&&drag.orig)S=JSON.parse(drag.orig);drag=null;zoomBox=null;const [a,b]=[...ptrs.values()];gest={d:Math.abs(a.x-b.x)||1,mx:(a.x+b.x)/2,my:(a.y+b.y)/2,pps:view.pps,x0:view.x0,y0:view.y0};draw();return}
+  if(mixOpen)return;stopGlide();ensureCtx();ed.setPointerCapture(e.pointerId);const rect=ed.getBoundingClientRect();const px=e.clientX-rect.left,py=e.clientY-rect.top;ptrs.set(e.pointerId,{x:px,y:py});
+  if(ptrs.size===2){if(drag&&drag.orig)S=JSON.parse(drag.orig);drag=null;zoomBox=null;G2.start([...ptrs.values()],"edit");draw();return}
   if(ptrs.size>2||!vis().length&&py>=RULER_H)return;
-  if(py<RULER_H){drag={k:"ruler",a:snapT(view.x0+px/view.pps)};if(!sel.tr.length&&vis().length){sel.tr=[vis()[0].id];renderHeads()}sel.t0=sel.t1=drag.a;draw();return}
+  if(py<RULER_H){const nw=performance.now();if(nw-(window._rTap||0)<320){window._rTap=0;CMD.zoomFit();return}window._rTap=nw;drag={k:"ruler",a:snapT(view.x0+px/view.pps)};if(!sel.tr.length&&vis().length){sel.tr=[vis()[0].id];renderHeads()}sel.t0=sel.t1=drag.a;draw();return}
   const h=hit(px,py);if(!h.row){sel.tr=[];sel.t0=sel.t1=snapT(h.t);renderHeads();draw();return}
   if(h.zone==="zoom"){drag={k:"zoom",a:px};return}
   const now=performance.now(),dbl=now-lastTap.t<320&&Math.abs(px-lastTap.x)<10&&Math.abs(py-lastTap.y)<10;lastTap={t:now,x:px,y:py};
@@ -721,8 +724,7 @@ ed.addEventListener("pointerdown",e=>{
   if(h.zone.startsWith("fade")){drag={k:"fade",side:h.zone[4],cid:h.clip.id,tid:h.row.t.id,orig,moved:false};return}});
 ed.addEventListener("pointermove",e=>{
   const rect=ed.getBoundingClientRect();const px=e.clientX-rect.left,py=e.clientY-rect.top;if(ptrs.has(e.pointerId))ptrs.set(e.pointerId,{x:px,y:py});
-  if(gest&&ptrs.size>=2){const [a,b]=[...ptrs.values()];const d=Math.abs(a.x-b.x)||1,mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
-    const tAt=gest.x0+gest.mx/gest.pps;view.pps=clamp(gest.pps*clamp(d/gest.d,0.05,20),0.02,SRr()/2);view.x0=Math.max(0,tAt-mx/view.pps);view.y0=clamp(gest.y0-(my-gest.my),0,maxY());draw();return}
+  if(gest&&ptrs.size>=2){G2.move([...ptrs.values()]);return}
   if(!drag){if(e.pointerType==="mouse"&&!e.buttons&&!mixOpen){const h=hit(px,py);ed.style.cursor=h.zone==="zoom"?"zoom-in":!h.clip?"text":h.zone.startsWith("trim")?"ew-resize":h.zone.startsWith("fade")?"crosshair":h.zone==="grab"?"grab":"text"}return}
   const t=view.x0+px/view.pps;
   if(drag.k!=="zoom"){if(px<10)view.x0=Math.max(0,view.x0-8/view.pps);else if(px>cvW()-10)view.x0+=8/view.pps}
@@ -744,7 +746,7 @@ ed.addEventListener("pointermove",e=>{
     fixFades(c);sel={t0:c.start,t1:cEnd(c),tr:[tt.id]};draw();return}
   if(drag.k==="fade"){drag.moved=true;S=JSON.parse(drag.orig);const tt=trk(drag.tid),c=tt.clips.find(k=>k.id===drag.cid);
     if(drag.side==="L")c.fi=clamp(t-c.start,0,c.len-c.fo);else c.fo=clamp(cEnd(c)-t,0,c.len-c.fi);draw();return}});
-function endPtr(e){ptrs.delete(e.pointerId);if(gest){if(ptrs.size<2)gest=null;return}if(!drag)return;const d=drag;drag=null;
+function endPtr(e){ptrs.delete(e.pointerId);if(gest){if(ptrs.size<2)G2.end();return}if(!drag)return;const d=drag;drag=null;
   if(d.k==="zoom"){const rect=ed.getBoundingClientRect();const px=e.clientX-rect.left;
     if(zoomBox&&zoomBox.b-zoomBox.a>8){const a=view.x0+zoomBox.a/view.pps,b=view.x0+zoomBox.b/view.pps;view.pps=clamp(cvW()/(b-a),0.02,SRr()/2);view.x0=a}else CMD.zoom(e.altKey?0.5:2,px);zoomBox=null;draw();return}
   if((d.k==="grab"||d.k==="trim"||d.k==="fade")&&d.moved){const now=JSON.stringify(S);S=JSON.parse(d.orig);undoS.push(JSON.stringify({S,sel:d.sel0||sel}));redoS=[];S=JSON.parse(now);
@@ -752,16 +754,49 @@ function endPtr(e){ptrs.delete(e.pointerId);if(gest){if(ptrs.size<2)gest=null;re
   drawOv(playing?playPos():null)}
 ed.addEventListener("pointerup",endPtr);ed.addEventListener("pointercancel",e=>{if(drag&&drag.orig)S=JSON.parse(drag.orig);drag=null;zoomBox=null;ptrs.delete(e.pointerId);gest=null;draw()});
 const maxY=()=>Math.max(0,vis().reduce((a,t)=>a+t.h,0)-(cvH()-RULER_H)+40);
-ed.addEventListener("wheel",e=>{if(mixOpen)return;e.preventDefault();const rect=ed.getBoundingClientRect();
+ed.addEventListener("wheel",e=>{if(mixOpen)return;e.preventDefault();stopGlide();const rect=ed.getBoundingClientRect();
+  if(e.altKey&&e.shiftKey){const r=rowAt(e.clientY-rect.top);if(r){const ts=sel.tr.includes(r.t.id)?selTracks():[r.t];ts.forEach(t=>t.h=clamp(Math.round(t.h*Math.exp(-(e.deltaY||e.deltaX)*0.006)),40,1400));liveHeights(ts);draw();clearTimeout(window._hT);window._hT=setTimeout(()=>{renderHeads();scheduleSave()},250)}return}
   if(e.ctrlKey||e.altKey||e.metaKey){CMD.zoom(Math.exp(-e.deltaY*0.01),e.clientX-rect.left);return}
   let dx=e.deltaX,dy=e.deltaY;if(e.shiftKey&&!dx){dx=dy;dy=0}view.x0=Math.max(0,view.x0+dx/view.pps);view.y0=clamp(view.y0+dy,0,maxY());draw()},{passive:false});
-$("heads").addEventListener("wheel",e=>{e.preventDefault();view.y0=clamp(view.y0+e.deltaY,0,maxY());draw()},{passive:false});
+$("heads").addEventListener("wheel",e=>{e.preventDefault();stopGlide();view.y0=clamp(view.y0+e.deltaY,0,maxY());draw()},{passive:false});
+// ---------- two-finger gestures (timeline + track headers) ----------
+// The movement locks to one action once it's clear: sideways spread = time zoom, vertical spread = track height,
+// both fingers moving together = scroll (with momentum).
+let glide=null;function stopGlide(){if(glide){cancelAnimationFrame(glide);glide=null}}
+function liveHeights(ts){ts.forEach(t=>{const el=$("headsIn").querySelector(`.hd[data-id="${t.id}"]`);if(el)el.style.height=t.h+"px"})}
+const G2={
+ start(pts,area){stopGlide();const [a,b]=pts,mx=(a.x+b.x)/2,my=(a.y+b.y)/2,r=rowAt(my);
+  gest={area,dx0:Math.abs(a.x-b.x),dy0:Math.abs(a.y-b.y),mx,my,pps:view.pps,x0:view.x0,y0:view.y0,mode:null,hist:[],track:r&&my>=RULER_H?r.t:null}},
+ lock(mode,dx,dy,mx,my){const g=gest;g.mode=mode;g.dx0=dx;g.dy0=dy;g.mx=mx;g.my=my;g.pps=view.pps;g.x0=view.x0;g.y0=view.y0;
+  if(mode==="height"){g.tracks=sel.tr.includes(g.track.id)?selTracks():[g.track];g.h0=new Map(g.tracks.map(t=>[t.id,t.h]));g.undo=JSON.stringify({S,sel});
+   let y=RULER_H-view.y0;for(const t of vis()){if(t===g.track)break;y+=t.h}g.trackTop=y}},
+ move(pts){if(!gest)return;gest.pend=pts;if(!gest.raf)gest.raf=requestAnimationFrame(()=>{if(!gest)return;gest.raf=0;this.apply(gest.pend)})},
+ apply(pts){const g=gest;if(!g)return;const [a,b]=pts,dx=Math.abs(a.x-b.x),dy=Math.abs(a.y-b.y),mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
+  if(!g.mode){const ddx=Math.abs(dx-g.dx0),ddy=Math.abs(dy-g.dy0),dm=Math.hypot(mx-g.mx,my-g.my);
+   if(g.area==="edit"&&ddx>22&&ddx>ddy*1.4&&ddx>dm*0.6)this.lock("zoom",dx,dy,mx,my);else if(ddy>22&&ddy>ddx*1.4&&ddy>dm*0.6&&g.track)this.lock("height",dx,dy,mx,my);else if(dm>12)this.lock("pan",dx,dy,mx,my);else return}
+  if(g.mode==="height"){const k=Math.max(dy,30)/Math.max(g.dy0,30);g.tracks.forEach(t=>{t.h=clamp(Math.round(g.h0.get(t.id)*k),40,1400)});liveHeights(g.tracks);
+   // keep the pinched track's top under the fingers
+   view.y0=clamp(g.y0,0,maxY());draw();return}
+  if(g.mode==="zoom"){const k=Math.max(dx,40)/Math.max(g.dx0,40),tAt=g.x0+g.mx/g.pps;view.pps=clamp(g.pps*k,0.02,SRr()/2);view.x0=Math.max(0,tAt-mx/view.pps)}
+  else if(g.area==="edit")view.x0=Math.max(0,g.x0-(mx-g.mx)/view.pps);
+  view.y0=clamp(g.y0-(my-g.my),0,maxY());g.hist.push({t:performance.now(),x:view.x0,y:view.y0});if(g.hist.length>6)g.hist.shift();draw()},
+ end(){const g=gest;gest=null;if(!g)return;if(g.raf){cancelAnimationFrame(g.raf);if(g.pend){gest=g;this.apply(g.pend);gest=null}}
+  if(g.mode==="height"){undoS.push(g.undo);redoS=[];renderHeads();draw();scheduleSave();msg("Track height");return}
+  if(g.mode==="pan"&&g.hist.length>=3){const A=g.hist[0],B=g.hist[g.hist.length-1],dt=(B.t-A.t)/1000;if(dt>0&&performance.now()-B.t<80){
+    let vx=(B.x-A.x)/dt,vy=(B.y-A.y)/dt,last=performance.now();
+    const step=now=>{const d=Math.min(0.05,(now-last)/1000);last=now;view.x0=Math.max(0,view.x0+vx*d);view.y0=clamp(view.y0+vy*d,0,maxY());const f=Math.pow(0.06,d);vx*=f;vy*=f;draw();
+      if(Math.abs(vy)>8||Math.abs(vx*view.pps)>8)glide=requestAnimationFrame(step);else glide=null};glide=requestAnimationFrame(step)}}}
+};
+{const hp=new Map();const H=$("heads");const rel=e=>{const r=H.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top}};
+ H.addEventListener("pointerdown",e=>{if(e.pointerType!=="touch"||e.target.closest("input"))return;hp.set(e.pointerId,rel(e));if(hp.size===2){window._hyBlock=performance.now();G2.start([...hp.values()],"heads")}});
+ H.addEventListener("pointermove",e=>{if(!hp.has(e.pointerId))return;hp.set(e.pointerId,rel(e));if(gest&&gest.area==="heads"&&hp.size>=2){window._hyBlock=performance.now();G2.move([...hp.values()])}});
+ const up=e=>{if(!hp.delete(e.pointerId))return;if(gest&&gest.area==="heads"&&hp.size<2)G2.end()};H.addEventListener("pointerup",up);H.addEventListener("pointercancel",up)}
 let gs=null;ed.addEventListener("gesturestart",e=>{e.preventDefault();gs=view.pps});
 ed.addEventListener("gesturechange",e=>{e.preventDefault();if(gs&&ptrs.size<2){const rect=ed.getBoundingClientRect();const ax=isFinite(e.clientX)?e.clientX-rect.left:cvW()/2;const tAt=view.x0+ax/view.pps;view.pps=clamp(gs*e.scale,0.02,SRr()/2);view.x0=Math.max(0,tAt-ax/view.pps);draw()}});
 document.addEventListener("gesturestart",e=>e.preventDefault());
 // vertical scroll by dragging the track headers
 {let hy=null;$("heads").addEventListener("pointerdown",e=>{if(e.target.closest("button,input,.rz")||e.target.closest("#rulerLabs"))return;hy={y:e.clientY,y0:view.y0,moved:false}});
- window.addEventListener("pointermove",e=>{if(!hy)return;if(Math.abs(e.clientY-hy.y)>6)hy.moved=true;if(hy.moved){view.y0=clamp(hy.y0-(e.clientY-hy.y),0,maxY());draw()}});
+ window.addEventListener("pointermove",e=>{if(!hy||gest)return;if(Math.abs(e.clientY-hy.y)>6)hy.moved=true;if(hy.moved){view.y0=clamp(hy.y0-(e.clientY-hy.y),0,maxY());draw()}});
  window.addEventListener("pointerup",()=>{if(hy&&hy.moved)hy.block=performance.now();window._hyBlock=hy&&hy.moved?performance.now():0;hy=null})}
 
 // ===================== plugins (inserts A–E, pre-fader, printed in bounces) =====================
@@ -1233,7 +1268,7 @@ document.addEventListener("visibilitychange",()=>{if(document.hidden&&dirty)save
 ui();renderHeads();resize();updRate();restore().finally(()=>{window.__booted=true});setTimeout(()=>{window.__booted=true},15000);
 try{if("serviceWorker" in navigator&&(location.protocol==="https:"||location.hostname==="localhost")&&!/claude|anthropic/.test(location.host))navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).catch(()=>{})}catch(e){}
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
-window.__kjd={renderRange,get S(){return S},set S(v){S=v},get sel(){return sel},set sel(v){sel=v},CMD,addTrack,newClip,bufs,regBuf,setMode:m=>{mode=m},undo,redo,zip,unzip,wav,parseWav,parseAiff,resample,sessEnd,renderHeads,renderMix};
+window.__kjd={renderRange,get view(){return view},get S(){return S},set S(v){S=v},get sel(){return sel},set sel(v){sel=v},CMD,addTrack,newClip,bufs,regBuf,setMode:m=>{mode=m},undo,redo,zip,unzip,wav,parseWav,parseAiff,resample,sessEnd,renderHeads,renderMix};
 }
 </script>
 </body>
