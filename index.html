@@ -67,7 +67,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
 .transport svg{width:16px;height:16px;fill:currentColor}
 #playBtn.on{background:linear-gradient(#56b356,#2f852f);color:#fff}
 .sm button{min-height:24px;font-size:11px;padding:0 7px}
-.sm{display:grid;grid-template-columns:auto auto;gap:2px}
+.sm{display:grid;grid-template-columns:auto auto auto;gap:2px}
 .sp{flex:1}
 #master{display:flex;gap:2px;align-items:flex-end;height:34px}
 #master div{width:6px;height:100%;background:#0c0c0c;border:1px solid #000;position:relative;overflow:hidden}
@@ -187,7 +187,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
   <div id="menubar">
     <span class="app">KJD Edit</span>
     <button class="mb" data-menu="File">File</button><button class="mb" data-menu="Edit">Edit</button><button class="mb" data-menu="View">View</button><button class="mb" data-menu="Track">Track</button><button class="mb" data-menu="Clip">Clip</button><button class="mb" data-menu="Window">Window</button>
-    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.6.5</span></div>
+    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.6.6</span></div>
   </div>
   <header id="tb">
     <div class="blk modes" id="modes" aria-label="Edit modes">
@@ -226,7 +226,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
     </div>
     <div class="blk sm">
       <button id="loopBtn" title="Loop playback (⌘⇧L)">Loop</button><button id="halfBtn" title="Half-speed (⇧Space)">½×</button>
-      <button id="followBtn" title="On: playhead stays where you stop. Off: returns to where playback started. Tap after stopping to change that stop too. (⌃N / N)">Follow</button><button id="mixBtn" title="Mix / Edit window (⌘=)">Mix</button>
+      <button id="followBtn" title="On: playhead stays where you stop. Off: returns to where playback started. Tap after stopping to change that stop too. (⌃N / N)">Follow</button><button id="mixBtn" title="Mix / Edit window (⌘=)">Mix</button><button id="rxBtn" title="Send the selected clip to iZotope RX 12 on your Mac" style="grid-column:3;grid-row:1/3;min-height:50px;background:linear-gradient(#7a5ad6,#5a3fb0);color:#fff;font-weight:bold">RX 12</button>
     </div>
     <div class="blk" id="master" title="Master meter"><div><i></i></div><div><i></i></div></div>
   </header>
@@ -1131,7 +1131,7 @@ $("tools").onclick=e=>{const b=e.target.closest("button");if(b)CMD.setTool(b.dat
 document.querySelector(".zoomb").onclick=e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.zp)return CMD.zoomPreset(+b.dataset.zp);({out:()=>CMD.zoom(.5),in:()=>CMD.zoom(2),fit:()=>CMD.zoomFit()})[b.dataset.z]()};
 $("playBtn").onclick=()=>{if(!playing)togglePlay()};$("stopBtn").onclick=()=>{if(playing)stop()};$("rtzBtn").onclick=()=>CMD.rtz();$("endBtn").onclick=()=>CMD.toEnd();
 $("rewBtn").onclick=()=>CMD.locate(-1);$("ffBtn").onclick=()=>CMD.locate(1);
-$("loopBtn").onclick=()=>CMD.toggleLoop();$("followBtn").onclick=()=>CMD.toggleFollow();$("focusBtn").onclick=()=>CMD.toggleFocus();$("mixBtn").onclick=()=>CMD.toggleMix();
+$("loopBtn").onclick=()=>CMD.toggleLoop();$("followBtn").onclick=()=>CMD.toggleFollow();$("focusBtn").onclick=()=>CMD.toggleFocus();$("mixBtn").onclick=()=>CMD.toggleMix();$("rxBtn").onclick=()=>{ensureCtx();sendToRX()};
 $("halfBtn").onclick=()=>{if(playing)stop();togglePlay(0.5)};
 $("obTxt").onclick=e=>{e.stopPropagation();outboxDlg(false)};
 $("counter").onclick=()=>{setFmt((fmt+1)%3);msg("Main counter: "+FMTN[fmt])};
@@ -1139,11 +1139,11 @@ $("ruler2Lab").onclick=()=>{r2=(r2+1)%3;$("ruler2Lab").textContent=["(off)","Sam
 $("selb").onclick=e=>{const f=e.target.dataset.f;if(!f)return;const cur=f==="t0"?sel.t0:f==="t1"?sel.t1:sel.t1-sel.t0;
   dialog("Edit Selection",`<div class="f">${{t0:"Start",t1:"End",len:"Length"}[f]} (${FMTN[fmt]})<input type="text" id="dSt" value="${fmtT(cur)}"></div>`,["Cancel","OK"]).then(r=>{if(r!=="OK")return;const v=parseT($("dSt").value);if(v===null)return msg("Bad time");
     if(f==="t0"){sel.t0=Math.max(0,v);if(sel.t1<sel.t0)sel.t1=sel.t0}else if(f==="t1"){sel.t1=Math.max(sel.t0,v)}else sel.t1=sel.t0+Math.max(0,v);ensureVisible(sel.t0);draw()})};
-const BAR=[["Separate","B",()=>CMD.separate()],["Trim ⊣","A",()=>CMD.trimStart()],["⊢ Trim","S",()=>CMD.trimEnd()],["Trim sel","⌘T",()=>CMD.trimToSel()],"|",
+const BAR=[["RX 12","Mac",()=>sendToRX()],"|",["Separate","B",()=>CMD.separate()],["Trim ⊣","A",()=>CMD.trimStart()],["⊢ Trim","S",()=>CMD.trimEnd()],["Trim sel","⌘T",()=>CMD.trimToSel()],"|",
 ["Fade in","D",()=>CMD.fadeIn()],["Fade out","G",()=>CMD.fadeOut()],["Fade/X","F",()=>CMD.fade()],["Fades…","⌘F",()=>CMD.fadesDlg()],"|",
 ["Heal","⌘H",()=>CMD.heal()],["Cut","⌘X",()=>CMD.cut()],["Copy","⌘C",()=>CMD.copy()],["Paste","⌘V",()=>CMD.paste()],["Clear","⌘B",()=>CMD.clear()],["Dup","⌘D",()=>CMD.duplicate()],"|",
 ["Gain −","⌃⇧↓",()=>CMD.gain(-1)],["Gain +","⌃⇧↑",()=>CMD.gain(1)],["Mute clip","⌘M",()=>CMD.muteClip()],["Nudge ◀",",",()=>CMD.nudge(-1)],["Nudge ▶",".",()=>CMD.nudge(1)],"|",
-["◀ Tab","⌥Tab",()=>CMD.tab(-1)],["Tab ▶","Tab",()=>CMD.tab(1)],["Zoom sel","E",()=>CMD.zoomToggle()],"|",["Undo","⌘Z",()=>undo()],["Redo","⌘⇧Z",()=>redo()],"|",["RX 12","Mac",()=>sendToRX()]];
+["◀ Tab","⌥Tab",()=>CMD.tab(-1)],["Tab ▶","Tab",()=>CMD.tab(1)],["Zoom sel","E",()=>CMD.zoomToggle()],"|",["Undo","⌘Z",()=>undo()],["Redo","⌘⇧Z",()=>redo()]];
 $("cmds").innerHTML=BAR.map((b,i)=>b==="|"?`<span class="div"></span>`:`<button data-i="${i}">${b[0]}<small>${b[1]}</small></button>`).join("");
 $("cmds").onclick=e=>{const b=e.target.closest("button");if(b){ensureCtx();BAR[+b.dataset.i][2]()}};
 function ui(){document.querySelectorAll("#modes button").forEach(b=>b.classList.toggle("on",b.dataset.m===mode));
