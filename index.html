@@ -145,6 +145,13 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
 #plug .ptitle span{display:flex;gap:4px}#plug .ptitle button{min-height:28px;font-size:11px;padding:0 7px}
 #plug .prm{display:grid;grid-template-columns:96px 1fr 78px;align-items:center;gap:8px;font-size:12px;padding:3px 0}
 #plug .prm input{accent-color:#9fc0ff;height:28px}#plug .prm i{font:11px var(--mono);font-style:normal;text-align:right;color:var(--ctr)}
+#rxw{position:fixed;left:2vw;top:5vh;width:96vw;height:88dvh;background:#111;border:1px solid #000;border-radius:8px;box-shadow:0 20px 60px #000c;z-index:46;display:none;flex-direction:column;overflow:hidden;resize:both;min-width:320px;min-height:200px}
+#rxw.open{display:flex}#rxw.min{height:44px!important;resize:none}#rxw.min #rxScreen{display:none}
+#rxw.max{left:0!important;top:0!important;width:100vw!important;height:100dvh!important;border-radius:0;resize:none}
+#rxw .rxh{display:flex;align-items:center;gap:6px;padding:5px 8px;background:#3a3a3a;border-bottom:1px solid #000;cursor:move;touch-action:none;flex-wrap:wrap}
+#rxw .rxh button{min-height:30px;font-size:12px;padding:0 9px}#rxw .rxh .sp{flex:1}
+#rxw .pill{font-size:11px;background:#1b1b1b;border:1px solid #000;border-radius:10px;padding:3px 9px;color:var(--solo)}#rxw .cn{font-size:11px;color:var(--dim)}
+#rxScreen{flex:1;min-height:0;background:#000;display:flex;align-items:center;justify-content:center;overflow:hidden}
 /* touch bar + status */
 #cmds{display:flex;gap:4px;padding:5px 8px;background:var(--tb);border-top:1px solid #000;overflow-x:auto;scrollbar-width:none}
 #cmds.hide{display:none}
@@ -176,7 +183,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
   <div id="menubar">
     <span class="app">KJD Edit</span>
     <button class="mb" data-menu="File">File</button><button class="mb" data-menu="Edit">Edit</button><button class="mb" data-menu="View">View</button><button class="mb" data-menu="Track">Track</button><button class="mb" data-menu="Clip">Clip</button><button class="mb" data-menu="Window">Window</button>
-    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.5.0</span></div>
+    <div class="r"><button id="obTxt" class="ob1" title="iCloud Outbox">☁︎ iCloud</button><span id="sessName">Untitled Project</span><span id="rateTxt">48 kHz</span><span>v0.6.1</span></div>
   </div>
   <header id="tb">
     <div class="blk modes" id="modes" aria-label="Edit modes">
@@ -215,7 +222,7 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
     </div>
     <div class="blk sm">
       <button id="loopBtn" title="Loop playback (⌘⇧L)">Loop</button><button id="halfBtn" title="Half-speed (⇧Space)">½×</button>
-      <button id="followBtn" title="Insertion follows playback (⌃N / N)">Follow</button><button id="mixBtn" title="Mix / Edit window (⌘=)">Mix</button>
+      <button id="followBtn" title="On: playhead stays where you stop. Off: returns to where playback started. Tap after stopping to change that stop too. (⌃N / N)">Follow</button><button id="mixBtn" title="Mix / Edit window (⌘=)">Mix</button>
     </div>
     <div class="blk" id="master" title="Master meter"><div><i></i></div><div><i></i></div></div>
   </header>
@@ -237,6 +244,9 @@ select,input[type=text],input[type=number]{background:var(--field);border:1px so
 </div>
 <div id="dlg"><div class="box" id="dlgBox"></div></div>
 <div id="plug" role="dialog" aria-label="Plugins"><div id="plugIn"></div></div>
+<div id="rxw" role="dialog" aria-label="iZotope RX 12 on your Mac"><div class="rxh"><b>RX 12 · Mac</b><span id="rxStat" class="pill">Idle</span><span id="rxConn" class="cn"></span><span class="sp"></span>
+ <button data-rx="save" title="Press ⌘S in RX for you">⌘S in RX</button><button data-rx="reopen">Reopen file</button><button data-rx="fit">1:1</button><button data-rx="re">Reconnect</button><button data-rx="min" title="Minimize">–</button><button data-rx="max" title="Full screen">⤢</button><button data-rx="close" aria-label="Close">✕</button></div>
+ <div id="rxScreen"></div></div>
 <input type="file" id="fileIn" accept="audio/*,.wav,.wave,.bwf,.aif,.aiff,.aifc,.mp3,.m4a,.flac,.caf" multiple hidden>
 <input type="file" id="sessIn" accept=".zip,application/zip" hidden>
 <script>
@@ -255,7 +265,7 @@ const bufs=new Map();
 let view={x0:0,pps:40,y0:0};
 let mode="slip",tool="smart",focusKeys=true,gridV=1,nudgeV=0.01,xShape="eqp",loop=false,follow=false,fmt=0,r2=1,heightIx=1,half=false,mixOpen=false;
 const HEIGHTS=[48,116,160,240];
-let undoS=[],redoS=[],clipboard=null,dirty=true;
+let undoS=[],redoS=[],clipboard=null,dirty=true,lastStop=null;
 const uid=()=>Math.random().toString(36).slice(2,10);
 const $=id=>document.getElementById(id);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -364,7 +374,10 @@ setTool(t){tool=t;ui();msg("Tool: "+({smart:"Smart Tool",zoom:"Zoomer",trim:"Tri
 cycleTool(){const o=["smart","zoom","trim","select","grab"];CMD.setTool(o[(o.indexOf(tool)+1)%o.length])},
 toggleFocus(){focusKeys=!focusKeys;ui();msg("Commands Keyboard Focus "+(focusKeys?"on":"off"))},
 toggleLoop(){loop=!loop;ui();msg("Loop playback "+(loop?"on":"off"))},
-toggleFollow(){follow=!follow;ui();msg("Insertion follows playback "+(follow?"on":"off"))},
+toggleFollow(){follow=!follow;let moved="";
+  // retroactive: if nothing changed since the last stop, re-decide where that stop left the cursor
+  if(lastStop&&!playing&&JSON.stringify(sel)===lastStop.key){if(follow)sel={t0:lastStop.pos,t1:lastStop.pos,tr:[...lastStop.start.tr]};else sel=clone(lastStop.start);lastStop.key=JSON.stringify(sel);ensureVisible(sel.t0);moved=follow?" — moved to where playback stopped":" — back to where playback started";draw()}
+  ui();msg((follow?"Playhead stays where you stop":"Playhead returns to start")+moved)},
 toggleHalf(){togglePlay(0.5)},
 trackMS(k){if(!sel.tr.length)return;snap();const ts=selTracks();const v=!ts[0][k];ts.forEach(t=>t[k]=v);renderHeads();updateMix();changed((k==="mute"?"Mute":"Solo")+" "+(v?"on":"off"))},
 trackHeight(d){const ts=sel.tr.length?selTracks():vis();ts.forEach(t=>{const nx=d>0?HEIGHTS.find(h=>h>t.h+1):HEIGHTS.slice().reverse().find(h=>h<t.h-1);t.h=nx||t.h});renderHeads();draw();scheduleSave()},
@@ -394,7 +407,7 @@ const KEYS=[
 ["Space","Play / Stop",()=>togglePlay()],["Shift+Space","Half-speed playback",()=>togglePlay(0.5)],
 ["Enter","Return to zero",()=>CMD.rtz()],["Alt+Enter","Go to end of session",()=>CMD.toEnd()],
 ["Shift+Meta+KeyL","Loop playback on/off",()=>CMD.toggleLoop()],
-["Ctrl+KeyN","Insertion follows playback",()=>CMD.toggleFollow()],["KeyN","Insertion follows playback",()=>CMD.toggleFollow(),1],
+["Ctrl+KeyN","Playhead: stay where stopped / return (works after stopping too)",()=>CMD.toggleFollow()],["KeyN","Playhead: stay where stopped / return",()=>CMD.toggleFollow(),1],
 ["Edit modes & tools"],
 ["F1","Shuffle mode",()=>CMD.setMode("shuffle")],["F2","Slip mode",()=>CMD.setMode("slip")],["F3","Spot mode",()=>CMD.setMode("spot")],["F4","Grid mode",()=>CMD.setMode("grid")],
 ["Alt+Digit1","Shuffle mode",()=>CMD.setMode("shuffle")],["Alt+Digit2","Spot mode",()=>CMD.setMode("spot")],["Alt+Digit3","Slip mode",()=>CMD.setMode("slip")],["Alt+Digit4","Grid mode",()=>CMD.setMode("grid")],
@@ -445,6 +458,7 @@ const comboOf=e=>(e.ctrlKey?"Ctrl+":"")+(e.altKey?"Alt+":"")+(e.shiftKey?"Shift+
 document.addEventListener("keydown",e=>{
   if($("dlg").classList.contains("open")){if(e.key==="Escape")closeDlg("Cancel");else if(e.key==="Enter"){e.preventDefault();closeDlg($("dlgBox").querySelector(".primary")?.dataset.r||"OK")}return}
   if(openMenu&&e.key==="Escape"){closeMenu();return}
+  if($("rxw").classList.contains("open")&&$("rxw").contains(document.activeElement)&&document.activeElement.tagName!=="BUTTON")return; // keys go to the Mac
   const tg=e.target;if(tg&&(tg.tagName==="INPUT"&&tg.type!=="range"||tg.tagName==="TEXTAREA"||tg.tagName==="SELECT"))return;
   const c=comboOf(e);let k=null;if(focusKeys&&!e.metaKey&&!e.ctrlKey&&!e.altKey)k=KMAP.get("F:"+c);if(!k)k=KMAP.get(c);
   if(k){e.preventDefault();e.stopPropagation();ensureCtx();if(!e.repeat||/Arrow|Comma|Period|Numpad|Bracket|KeyT|KeyR/.test(c))k[2]()}
@@ -459,7 +473,7 @@ function showKeys(){let h=`<div class="keys">`;KEYS.forEach(k=>{h+=k.length===1?
 
 // ===================== menus =====================
 const MENUS={
-File:[["New Project…",()=>newSessionDlg()],["Open Project…",()=>openProjectDlg(),"Meta+KeyO"],"-",["Save",()=>saveNow(true),"Meta+KeyS"],["Save Project to iCloud…",()=>saveProjectICloud(),"Shift+Meta+KeyS"],["Rename Project…",()=>renameSession()],"-",["iCloud Outbox…",()=>outboxDlg(false)],["Link KJD Edit Folder…",()=>linkFolder()],"-",
+File:[["New Project…",()=>newSessionDlg()],["Open Project…",()=>openProjectDlg(),"Meta+KeyO"],"-",["Save",()=>saveNow(true),"Meta+KeyS"],["Save Project to iCloud…",()=>saveProjectICloud(),"Shift+Meta+KeyS"],["Rename Project…",()=>renameSession()],"-",["iCloud Outbox…",()=>outboxDlg(false)],["RX Bridge Setup…",()=>rxSetup()],["Link KJD Edit Folder…",()=>linkFolder()],"-",
   ["Import Audio…",()=>$("fileIn").click(),"Shift+Meta+KeyI"],["Bounce Mix…",()=>bounceDlg(),"Alt+Meta+KeyB"],["Export Clips as Files…",()=>exportClips(),"Shift+Meta+KeyK"]],
 Edit:[["Undo",()=>undo(),"Meta+KeyZ"],["Redo",()=>redo(),"Shift+Meta+KeyZ"],"-",["Cut",()=>CMD.cut(),"Meta+KeyX"],["Copy",()=>CMD.copy(),"Meta+KeyC"],["Paste",()=>CMD.paste(),"Meta+KeyV"],["Clear",()=>CMD.clear(),"Meta+KeyB"],"-",
   ["Select All",()=>CMD.selectAll(),"Meta+KeyA"],["Duplicate",()=>CMD.duplicate(),"Meta+KeyD"],["Repeat…",()=>CMD.repeat(),"Alt+KeyR"],"-",["Separate Clip",()=>CMD.separate(),"Meta+KeyE"],["Heal Separation",()=>CMD.heal(),"Meta+KeyH"],
@@ -467,10 +481,10 @@ Edit:[["Undo",()=>undo(),"Meta+KeyZ"],["Redo",()=>redo(),"Shift+Meta+KeyZ"],"-",
   ["Fades…",()=>CMD.fadesDlg(),"Meta+KeyF"],["Fade to Start",()=>CMD.fadeIn(),"F:KeyD"],["Fade to End",()=>CMD.fadeOut(),"F:KeyG"]],
 View:[["Tracks List",()=>CMD.toggleTL(),null,()=>tlShown()],["Clips List",()=>CMD.toggleCL(),null,()=>$("main").classList.contains("cl")],["Touch Command Bar",()=>CMD.toggleBar(),null,()=>!$("cmds").classList.contains("hide")],"-",
   ["Zoom In",()=>CMD.zoom(2),"Meta+BracketRight"],["Zoom Out",()=>CMD.zoom(.5),"Meta+BracketLeft"],["Zoom to Session",()=>CMD.zoomFit(),"Alt+KeyA"],["Zoom Toggle",()=>CMD.zoomToggle(),"F:KeyE"],"-",
-  ["Taller Tracks",()=>CMD.trackHeight(1),"Ctrl+ArrowUp"],["Shorter Tracks",()=>CMD.trackHeight(-1),"Ctrl+ArrowDown"],"-",["Counter: Min:Secs",()=>setFmt(0),null,()=>fmt===0],["Counter: Samples",()=>setFmt(1),null,()=>fmt===1],["Counter: Timecode (30)",()=>setFmt(2),null,()=>fmt===2]],
+  ["Playhead Stays Where Stopped",()=>CMD.toggleFollow(),"Ctrl+KeyN",()=>follow],"-",["Taller Tracks",()=>CMD.trackHeight(1),"Ctrl+ArrowUp"],["Shorter Tracks",()=>CMD.trackHeight(-1),"Ctrl+ArrowDown"],"-",["Counter: Min:Secs",()=>setFmt(0),null,()=>fmt===0],["Counter: Samples",()=>setFmt(1),null,()=>fmt===1],["Counter: Timecode (30)",()=>setFmt(2),null,()=>fmt===2]],
 Track:[["New…",()=>CMD.newTracks(),"Shift+Meta+KeyN"],["Delete…",()=>CMD.deleteTracks()],"-",["Mute Selected",()=>CMD.trackMS("mute"),"Shift+KeyM"],["Solo Selected",()=>CMD.trackMS("solo"),"Shift+KeyS"]],
-Clip:[["Rename…",()=>CMD.rename(),"Shift+Meta+KeyR"],["Spot…",()=>CMD.spot()],["Mute / Unmute",()=>CMD.muteClip(),"Meta+KeyM"],"-",["Clip Gain +1 dB",()=>CMD.gain(1),"Ctrl+Shift+ArrowUp"],["Clip Gain −1 dB",()=>CMD.gain(-1),"Ctrl+Shift+ArrowDown"],["Clear Clip Gain",()=>CMD.gain(null),"Ctrl+Shift+KeyB"]],
-Window:[["Edit",()=>{if(mixOpen)CMD.toggleMix()},null,()=>!mixOpen],["Mix",()=>{if(!mixOpen)CMD.toggleMix()},"Meta+Equal",()=>mixOpen],"-",["Keyboard Shortcuts",()=>showKeys(),"Meta+Slash"]],
+Clip:[["Send to RX 12…",()=>sendToRX()],"-",["Rename…",()=>CMD.rename(),"Shift+Meta+KeyR"],["Spot…",()=>CMD.spot()],["Mute / Unmute",()=>CMD.muteClip(),"Meta+KeyM"],"-",["Clip Gain +1 dB",()=>CMD.gain(1),"Ctrl+Shift+ArrowUp"],["Clip Gain −1 dB",()=>CMD.gain(-1),"Ctrl+Shift+ArrowDown"],["Clear Clip Gain",()=>CMD.gain(null),"Ctrl+Shift+KeyB"]],
+Window:[["Edit",()=>{if(mixOpen)CMD.toggleMix()},null,()=>!mixOpen],["Mix",()=>{if(!mixOpen)CMD.toggleMix()},"Meta+Equal",()=>mixOpen],["RX 12 (Mac)",()=>openRxWin()],"-",["Keyboard Shortcuts",()=>showKeys(),"Meta+Slash"]],
 };
 let openMenu=null,menuEl=null;
 function tlShown(){const m=$("main");return innerWidth<=1250?m.classList.contains("tlon"):!m.classList.contains("notl")}
@@ -520,7 +534,7 @@ function schedule(ac,tn,s0,s1,when,r,list,onlyClips){
 function play(rate){ensureCtx();rate=rate||1;half=rate<1;const ses=Math.max(sessEnd(),0.01);
   const rng=hasRange(),lp=loop&&rng;const s0=sel.t0,s1=rng?sel.t1:Infinity;
   const tn=buildTrackNodes(ctx,master,true);const list=[];const when=ctx.currentTime+0.06;
-  pl={tn,list,s0,s1,when,rate,lp,iter:0,end:rng?s1:ses};
+  pl={tn,list,s0,s1,when,rate,lp,iter:0,end:rng?s1:ses,startSel:clone(sel)};
   if(lp){schedule(ctx,tn,s0,s1,when,rate,list);pl.iter=1}else schedule(ctx,tn,s0,rng?s1:ses+1,when,rate,list);
   playing=true;ui();msg(half?"Half-speed play":"Play");
   pl.timer=setInterval(()=>{if(!pl)return;const L=(pl.s1-pl.s0)/pl.rate;
@@ -529,7 +543,7 @@ function play(rate){ensureCtx();rate=rate||1;half=rate<1;const ses=Math.max(sess
   requestAnimationFrame(tick)}
 function playPos(){if(!pl)return sel.t0;const el=Math.max(0,ctx.currentTime-pl.when)*pl.rate;if(pl.lp){const L=pl.s1-pl.s0;return pl.s0+(el%L)}return pl.s0+el}
 function stop(){if(!pl)return;const pos=playPos();clearInterval(pl.timer);pl.list.forEach(s=>{try{s.stop()}catch(e){}});pl.tn.forEach(g=>{try{(g._fx||[]).forEach(f=>f.output.disconnect());g.disconnect();g._v.disconnect();g._p.disconnect()}catch(e){}});
-  if(follow&&!pl.lp&&!(pl.s1<Infinity)){sel.t0=sel.t1=Math.min(pos,pl.end)}pl=null;playing=false;half=false;ui();draw();drawOv();msg("Stop");clearMeters()}
+  const stopAt=Math.min(pos,pl.lp?pl.s1:pl.end);if(follow)sel={t0:stopAt,t1:stopAt,tr:[...pl.startSel.tr]};else sel=clone(pl.startSel);lastStop={start:pl.startSel,pos:stopAt,key:JSON.stringify(sel)};pl=null;playing=false;half=false;ui();draw();drawOv();msg("Stop");clearMeters()}
 function togglePlay(r){ensureCtx();if(playing)stop();else play(r)}
 function updateMix(){if(!pl)return;S.tracks.forEach(t=>{const g=pl.tn.get(t.id);if(g){g._v.gain.setTargetAtTime(audible(t)?db2g(t.vol):0,ctx.currentTime,0.02);g._p.pan.setTargetAtTime(t.pan,ctx.currentTime,0.02)}})}
 const mbuf=new Float32Array(1024);
@@ -809,6 +823,65 @@ function renderPlug(){const t=trk(plugT);if(!t){$("plug").classList.remove("open
  P.addEventListener("pointermove",e=>{if(!dg)return;P.style.left=clamp(e.clientX-dg.dx,0,innerWidth-80)+"px";P.style.top=clamp(e.clientY-dg.dy,0,innerHeight-60)+"px";P.style.right="auto"});
  P.addEventListener("pointerup",()=>{dg=null})}
 
+// ===================== iZotope RX 12 on the Mac (via KJD RX Bridge + Screen Sharing) =====================
+let rxCfg=(()=>{try{return JSON.parse(localStorage.getItem("kjd-rx")||"{}")}catch(e){return {}}})();
+const saveRxCfg=()=>{try{localStorage.setItem("kjd-rx",JSON.stringify(rxCfg))}catch(e){}};
+const rxBase=()=>(rxCfg.url||"").trim().replace(/\/+$/,"");
+async function rxFetch(path,opt={}){const r=await fetch(rxBase()+path,Object.assign({},opt,{headers:Object.assign({"X-KJD-Token":rxCfg.token||""},opt.headers||{})}));
+  if(!r.ok){let m="HTTP "+r.status;try{m=(await r.json()).error||m}catch(e){}throw new Error(m)}return r}
+function rxSetup(){if(inArtifact())return msg("RX works in the installed app: kjdombroski.github.io/kjd-edit");
+  dialog("RX Bridge Setup",`<p>On the Mac, open <b>KJD RX Bridge</b> and tap <b>Copy Pairing Code</b>, then paste it here (Universal Clipboard).</p>
+   <div class="f">Pairing code or bridge address<input type="text" id="rxU" value="${esc(rxCfg.url?rxBase()+(rxCfg.token?"#"+rxCfg.token:""):"")}" placeholder="https://your-mac.tailnet.ts.net#token" autocapitalize="off" autocorrect="off"></div>
+   <div class="f">Mac user name (for the screen view)<input type="text" id="rxN" value="${esc(rxCfg.user||"")}" autocapitalize="off" autocorrect="off"></div>
+   <div class="f">Mac password<input type="password" id="rxP" value="${esc(rxCfg.pass||"")}"></div>
+   <p>The password stays on this iPad and is only sent to your Mac's Screen Sharing.</p>
+   <div style="display:flex;gap:8px;align-items:center"><button id="rxTest" type="button">Test Connection</button><span id="rxTestOut" style="color:var(--dim);font-size:12px"></span></div>`,["Cancel","Save"]).then(r=>{if(r==="Save"){readRxForm();msg("RX Bridge settings saved")}});
+  setTimeout(()=>{const b=$("rxTest");if(b)b.onclick=async()=>{readRxForm();$("rxTestOut").textContent="Checking…";try{const j=await (await rxFetch("/api/ping")).json();
+    $("rxTestOut").textContent=`Connected to ${j.host} · RX 12 ${j.rx?"found":"NOT found"} · Screen Sharing ${j.screen_sharing?"on":"OFF"}`}catch(e){$("rxTestOut").textContent="No connection: "+e.message}}},50)}
+function readRxForm(){let u=$("rxU").value.trim();const i=u.indexOf("#");if(i>=0){rxCfg.token=u.slice(i+1).trim();u=u.slice(0,i)}if(u&&!/^https?:\/\//.test(u))u="https://"+u;rxCfg.url=u;rxCfg.user=$("rxN").value.trim();rxCfg.pass=$("rxP").value;saveRxCfg()}
+let rxJob=null,rxTimer=null,rfb=null;
+async function sendToRX(){if(inArtifact())return msg("RX works in the installed app: kjdombroski.github.io/kjd-edit");
+  const t=selTracks()[0],c=t&&clipsIn(t)[0];if(!need(c,"Select a clip to send to RX"))return;if(!rxBase()||!rxCfg.token)return rxSetup();
+  const b=bufs.get(c.buf);if(!b)return;const sr=b.buf.sampleRate,s0=Math.round(c.offset*sr),n=Math.max(1,Math.round(c.len*sr));
+  const out=new AudioBuffer({numberOfChannels:b.buf.numberOfChannels,length:n,sampleRate:sr});for(let ch=0;ch<out.numberOfChannels;ch++)out.copyToChannel(b.buf.getChannelData(ch).subarray(s0,s0+n),ch);
+  msg("Sending “"+c.name+"” to RX 12…");
+  try{const r=await rxFetch("/api/jobs",{method:"POST",body:new Blob([wav(out,"32f")],{type:"audio/wav"}),headers:{"Content-Type":"audio/wav","X-KJD-Name":encodeURIComponent(c.name),"X-KJD-Project":encodeURIComponent(S.name)}});
+    const j=await r.json();rxJob={id:j.id,cid:c.id,tid:t.id,name:c.name.replace(/-RX\d*$/,""),applied:0};openRxWin();rxStatus("Open in RX — process, then press ⌘S in RX");
+    clearInterval(rxTimer);rxTimer=setInterval(rxPoll,1000)}catch(e){msg("RX Bridge: "+e.message+" — check File › RX Bridge Setup")}}
+async function rxPoll(){if(!rxJob)return;try{const j=await (await rxFetch("/api/jobs/"+rxJob.id)).json();if(j.version>rxJob.applied){rxJob.applied=j.version;await rxApply(j.version)}}catch(e){rxStatus("Lost the bridge: "+e.message)}}
+async function rxApply(ver){rxStatus("Saved in RX — bringing it back…");
+  const ab=await (await rxFetch("/api/jobs/"+rxJob.id+"/file")).arrayBuffer();let r=parseWav(ab);let buf=r?r.buf:await new OfflineAudioContext(1,1,SRr()).decodeAudioData(ab);
+  if(buf.sampleRate!==SRr())buf=await resample(buf,SRr());
+  let c=null,t=null;S.tracks.forEach(tt=>tt.clips.forEach(k=>{if(k.id===rxJob.cid){c=k;t=tt}}));if(!c)return rxStatus("The clip was deleted — RX version not applied");
+  const id=uid(),nm=rxJob.name+"-RX"+(ver>1?ver:"");regBuf(id,nm,buf,"RX 12 · "+SRr()/1000+" kHz");snap();
+  const L=c.len;c.buf=id;c.offset=0;c.len=Math.min(L,buf.duration);c.name=nm;fixFades(c);renderHeads();changed("RX version applied to “"+nm+"” (⌘Z to undo)");
+  rxStatus(`Applied ✓ ${nm}${Math.abs(buf.duration-L)>0.002?" · length changed in RX":""} — ⌘S in RX again to update`)}
+function rxStatus(t){const el=$("rxStat");if(el)el.textContent=t}
+function openRxWin(){$("rxw").classList.add("open");$("rxw").classList.remove("min");rxConnect()}
+async function rxConnect(){if(rfb)return;const scr=$("rxScreen");scr.innerHTML="";
+  try{const {default:RFB}=await import(new URL("novnc/core/rfb.js",location.href).href);
+    const url=rxBase().replace(/^http/,"ws")+"/vnc?token="+encodeURIComponent(rxCfg.token);
+    rfb=new RFB(scr,url,{credentials:{username:rxCfg.user||"",password:rxCfg.pass||""},wsProtocols:["binary"]});
+    rfb.scaleViewport=true;rfb.resizeSession=false;rfb.showDotCursor=true;rfb.qualityLevel=7;rfb.compressionLevel=2;
+    rfb.addEventListener("connect",()=>$("rxConn").textContent="Mac screen connected");
+    rfb.addEventListener("disconnect",e=>{rfb=null;$("rxConn").textContent=e.detail.clean?"Screen view closed":"Screen view lost — tap Reconnect"});
+    rfb.addEventListener("securityfailure",()=>{$("rxConn").textContent="Mac rejected the login — check File › RX Bridge Setup"});
+    rfb.addEventListener("credentialsrequired",()=>{dialog("Mac Login",`<div class="f">User name<input type="text" id="rxN2" value="${esc(rxCfg.user||"")}" autocapitalize="off"></div><div class="f">Password<input type="password" id="rxP2"></div>`,["Cancel","Connect"]).then(r=>{
+      if(r!=="Connect"||!rfb)return;rxCfg.user=$("rxN2").value.trim();rxCfg.pass=$("rxP2").value;saveRxCfg();rfb.sendCredentials({username:rxCfg.user,password:rxCfg.pass})})});
+    $("rxConn").textContent="Connecting to the Mac screen…"}catch(e){$("rxConn").textContent="Screen view unavailable: "+e.message}}
+function closeRx(){$("rxw").classList.remove("open");if(rfb){try{rfb.disconnect()}catch(e){}rfb=null}
+  if(rxJob){const j=rxJob;setTimeout(async()=>{await rxPoll();if(rxJob===j){clearInterval(rxTimer);rxJob=null}},1200)}}
+{const W=$("rxw");let dg=null;
+ W.addEventListener("click",async e=>{const b=e.target.closest("[data-rx]");if(!b)return;const a=b.dataset.rx;
+  if(a==="close")closeRx();else if(a==="min"){W.classList.toggle("min")}else if(a==="max"){W.classList.toggle("max")}
+  else if(a==="re"){if(rfb){try{rfb.disconnect()}catch(e){}rfb=null}rxConnect()}
+  else if(a==="reopen"&&rxJob){try{await rxFetch("/api/jobs/"+rxJob.id+"/reopen",{method:"POST"});rxStatus("Reopened in RX")}catch(err){rxStatus(err.message)}}
+  else if(a==="save"&&rxJob){try{await rxFetch("/api/jobs/"+rxJob.id+"/save",{method:"POST"});rxStatus("Sent ⌘S to RX…")}catch(err){rxStatus(err.message)}}
+  else if(a==="fit"&&rfb){rfb.scaleViewport=!rfb.scaleViewport;rfb.clipViewport=!rfb.scaleViewport;b.textContent=rfb.scaleViewport?"1:1":"Fit"}});
+ W.addEventListener("pointerdown",e=>{if(e.target.closest(".rxh")&&!e.target.closest("button")&&!W.classList.contains("max")){const r=W.getBoundingClientRect();dg={dx:e.clientX-r.left,dy:e.clientY-r.top};W.setPointerCapture(e.pointerId)}});
+ W.addEventListener("pointermove",e=>{if(!dg)return;W.style.left=clamp(e.clientX-dg.dx,0,innerWidth-120)+"px";W.style.top=clamp(e.clientY-dg.dy,0,innerHeight-50)+"px"});
+ W.addEventListener("pointerup",()=>{dg=null})}
+
 // ===================== track headers, lists, mix =====================
 const volTxt=v=>v<=-60?"-inf":(v>0?"+":"")+v.toFixed(1);
 const panTxt=p=>p===0?"<0>":(p<0?"<":"")+Math.round(Math.abs(p)*100)+(p>0?">":"");
@@ -1046,7 +1119,7 @@ const BAR=[["Separate","B",()=>CMD.separate()],["Trim ⊣","A",()=>CMD.trimStart
 ["Fade in","D",()=>CMD.fadeIn()],["Fade out","G",()=>CMD.fadeOut()],["Fade/X","F",()=>CMD.fade()],["Fades…","⌘F",()=>CMD.fadesDlg()],"|",
 ["Heal","⌘H",()=>CMD.heal()],["Cut","⌘X",()=>CMD.cut()],["Copy","⌘C",()=>CMD.copy()],["Paste","⌘V",()=>CMD.paste()],["Clear","⌘B",()=>CMD.clear()],["Dup","⌘D",()=>CMD.duplicate()],"|",
 ["Gain −","⌃⇧↓",()=>CMD.gain(-1)],["Gain +","⌃⇧↑",()=>CMD.gain(1)],["Mute clip","⌘M",()=>CMD.muteClip()],["Nudge ◀",",",()=>CMD.nudge(-1)],["Nudge ▶",".",()=>CMD.nudge(1)],"|",
-["◀ Tab","⌥Tab",()=>CMD.tab(-1)],["Tab ▶","Tab",()=>CMD.tab(1)],["Zoom sel","E",()=>CMD.zoomToggle()],"|",["Undo","⌘Z",()=>undo()],["Redo","⌘⇧Z",()=>redo()]];
+["◀ Tab","⌥Tab",()=>CMD.tab(-1)],["Tab ▶","Tab",()=>CMD.tab(1)],["Zoom sel","E",()=>CMD.zoomToggle()],"|",["Undo","⌘Z",()=>undo()],["Redo","⌘⇧Z",()=>redo()],"|",["RX 12","Mac",()=>sendToRX()]];
 $("cmds").innerHTML=BAR.map((b,i)=>b==="|"?`<span class="div"></span>`:`<button data-i="${i}">${b[0]}<small>${b[1]}</small></button>`).join("");
 $("cmds").onclick=e=>{const b=e.target.closest("button");if(b){ensureCtx();BAR[+b.dataset.i][2]()}};
 function ui(){document.querySelectorAll("#modes button").forEach(b=>b.classList.toggle("on",b.dataset.m===mode));

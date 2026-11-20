@@ -1,0 +1,48 @@
+#!/bin/bash
+# KJD RX Bridge launcher — starts the bridge (standard-library Python, nothing to install),
+# publishes it privately to your devices with Tailscale, keeps the Mac awake while it runs,
+# and shows the pairing code for KJD Edit.
+APP="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPT="$APP/Resources/kjd_rx_bridge.py"
+SUP="$HOME/Library/Application Support/KJD RX Bridge"; LOGD="$HOME/Library/Logs/KJD RX Bridge"
+mkdir -p "$SUP" "$LOGD"; LOG="$LOGD/bridge.log"; PIDF="$SUP/bridge.pid"; PORT=8770
+alert(){ osascript -e "display alert \"KJD RX Bridge\" message \"$1\" as critical" >/dev/null 2>&1; }
+PY=""; for p in /opt/homebrew/bin/python3 /usr/local/bin/python3 /Library/Frameworks/Python.framework/Versions/Current/bin/python3 /usr/bin/python3; do
+  if [ -x "$p" ] && "$p" -c 'import sys;sys.exit(0 if sys.version_info>=(3,9) else 1)' 2>/dev/null; then PY="$p"; break; fi; done
+[ -z "$PY" ] && { alert "Python 3 wasn't found. Install it from python.org, then open KJD RX Bridge again."; exit 1; }
+TS=""; for t in /Applications/Tailscale.app/Contents/MacOS/Tailscale "$(command -v tailscale 2>/dev/null)"; do [ -n "$t" ] && [ -x "$t" ] && { TS="$t"; break; }; done
+running(){ [ -f "$PIDF" ] && kill -0 "$(cat "$PIDF")" 2>/dev/null; }
+if ! running; then
+  echo "=== start $(date) ===" >> "$LOG"
+  nohup "$PY" "$SCRIPT" >> "$LOG" 2>&1 &
+  echo $! > "$PIDF"; caffeinate -i -w "$(cat "$PIDF")" >/dev/null 2>&1 &
+  sleep 1
+  running || { alert "The bridge didn't start. Details are in ~/Library/Logs/KJD RX Bridge/bridge.log"; exit 1; }
+fi
+TOKEN="$("$PY" "$SCRIPT" --token)"
+URL=""; NOTE=""
+if [ -n "$TS" ]; then
+  "$TS" serve --bg "$PORT" >> "$LOG" 2>&1 || NOTE="Tailscale couldn't publish the bridge — in the Tailscale admin page turn on MagicDNS and HTTPS Certificates, then reopen this app."
+  DNS="$("$TS" status --json 2>/dev/null | "$PY" -c 'import json,sys;print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))' 2>/dev/null)"
+  [ -n "$DNS" ] && URL="https://$DNS"
+else
+  NOTE="Tailscale isn't installed. Install it from tailscale.com (Mac and iPad, same account), then reopen this app."
+fi
+SS="$(nc -z 127.0.0.1 5900 >/dev/null 2>&1 && echo on || echo OFF — turn on System Settings › General › Sharing › Screen Sharing)"
+RX="$("$PY" -c 'import glob,os;h=[x for p in ["/Applications/iZotope RX 12*/*.app","/Applications/*RX 12*Audio Editor*.app","/Applications/iZotope*/*RX 12*.app",os.path.expanduser("~/Applications/*RX 12*.app")] for x in glob.glob(p)];print(os.path.basename(h[0]) if h else "NOT FOUND")')"
+CODE="${URL:-https://<this-mac>}#$TOKEN"
+MSG="KJD RX Bridge is running and keeping this Mac awake.
+
+Pairing code (paste into KJD Edit › File › RX Bridge Setup):
+$CODE
+
+RX: $RX
+Screen Sharing: $SS
+${NOTE:+
+$NOTE}"
+ANS="$(osascript -e "button returned of (display dialog \"$(printf '%s' "$MSG" | sed 's/"/\\"/g')\" with title \"KJD RX Bridge\" buttons {\"Quit Bridge\",\"Copy Pairing Code\",\"OK\"} default button \"Copy Pairing Code\")" 2>/dev/null)"
+case "$ANS" in
+  "Copy Pairing Code") printf '%s' "$CODE" | pbcopy; osascript -e 'display notification "Pairing code copied — paste it on the iPad" with title "KJD RX Bridge"' ;;
+  "Quit Bridge") running && kill "$(cat "$PIDF")"; rm -f "$PIDF"; [ -n "$TS" ] && "$TS" serve --https=443 off >> "$LOG" 2>&1 ;;
+esac
+exit 0
