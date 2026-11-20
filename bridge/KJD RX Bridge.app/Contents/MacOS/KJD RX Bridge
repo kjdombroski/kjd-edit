@@ -22,8 +22,14 @@ fi
 TOKEN="$("$PY" "$SCRIPT" --token)"
 URL=""; NOTE=""
 if [ -n "$TS" ]; then
-  "$TS" serve --bg "$PORT" >> "$LOG" 2>&1 || NOTE="Tailscale couldn't publish the bridge — in the Tailscale admin page turn on MagicDNS and HTTPS Certificates, then reopen this app."
-  DNS="$("$TS" status --json 2>/dev/null | "$PY" -c 'import json,sys;print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))' 2>/dev/null)"
+  # never hang here: if HTTPS isn't enabled for the tailnet, tailscale prints a link and waits
+  SOUT="$(perl -e 'alarm 12; exec @ARGV' "$TS" serve --bg "$PORT" 2>&1)"; SRC=$?; echo "$SOUT" >> "$LOG"
+  if [ $SRC -ne 0 ]; then
+    ENABLE="$(printf '%s' "$SOUT" | grep -Eo 'https://login\.tailscale\.com[^ ]*' | head -1)"
+    NOTE="Tailscale needs HTTPS turned on for your network (one time)."
+    [ -n "$ENABLE" ] && { open "$ENABLE"; NOTE="$NOTE A Tailscale page just opened — tap Enable, then open KJD RX Bridge again."; } || NOTE="$NOTE In the Tailscale admin page › DNS, turn on MagicDNS and HTTPS Certificates, then open KJD RX Bridge again."
+  fi
+  DNS="$(perl -e "alarm 6; exec @ARGV" "$TS" status --json 2>/dev/null | "$PY" -c 'import json,sys;print(json.load(sys.stdin)["Self"]["DNSName"].rstrip("."))' 2>/dev/null)"
   [ -n "$DNS" ] && URL="https://$DNS"
 else
   NOTE="Tailscale isn't installed. Install it from tailscale.com (Mac and iPad, same account), then reopen this app."
