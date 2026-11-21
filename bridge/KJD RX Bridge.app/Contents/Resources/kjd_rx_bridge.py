@@ -4,6 +4,7 @@
 Standard library only (no installs). Runs a small local server that:
   • receives a clip from KJD Edit, opens it in RX 12, and hands back the processed file each time you press ⌘S in RX
   • relays macOS Screen Sharing (VNC, port 5900) to the RX window inside KJD Edit, so you can see and click RX from the iPad
+  • runs the Piano Excerpts engine (the Mac app's own code, via pe_worker.py) for KJD Edit's Piano Excerpts page
 
 Reach it from the iPad through Tailscale (`tailscale serve` gives this Mac a private https:// address).
 Every request needs the pairing token shown by the launcher.
@@ -11,7 +12,7 @@ Every request needs the pairing token shown by the launcher.
 import asyncio, base64, glob, hashlib, json, os, re, secrets, shutil, subprocess, sys, time, uuid
 from urllib.parse import urlsplit, parse_qs, unquote
 
-VERSION = "0.2.0"
+VERSION = "0.3.0"
 APP_NAME = "KJD RX Bridge"
 SUPPORT = os.path.expanduser(f"~/Library/Application Support/{APP_NAME}")
 WORK = os.path.expanduser("~/Music/KJD Edit RX")
@@ -163,6 +164,141 @@ def file_state(job):
             job["version"] += 1
             job.pop("_pending", None)
     return "saved" if job["version"] > 0 else "open"
+
+
+# ---------------------------------------------------------------- Piano Excerpts engine (for the iPad page)
+PE_WORKER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "pe_worker.py")
+PE_TMP_PREFIX = os.path.join(__import__("tempfile").gettempdir(), "kjd-pe-previews")
+
+
+def find_pe():
+    """The Piano Excerpts app's code folder and the Python it set up for itself (its venv)."""
+    code = os.environ.get("KJD_PE_PATH")
+    if not code:
+        cands = [os.path.expanduser("~/Desktop/Piano Excerpt Maker/Piano Excerpts.app")]
+        cands += glob.glob(os.path.expanduser("~/Desktop/*/Piano Excerpts.app")) + glob.glob(os.path.expanduser("~/Desktop/Piano Excerpts.app"))
+        cands += ["/Applications/Piano Excerpts.app", os.path.expanduser("~/Applications/Piano Excerpts.app")]
+        for c in cands:
+            p = os.path.join(c, "Contents", "Resources", "app")
+            if os.path.isdir(os.path.join(p, "piano_excerpts")):
+                code = p
+                break
+    py = os.environ.get("KJD_PE_PY")
+    if not py:
+        venv = os.path.expanduser("~/Library/Application Support/Piano Excerpts/venv/bin")
+        py = next((os.path.join(venv, n) for n in ("python3", "python") if os.path.exists(os.path.join(venv, n))), None)
+    return code, py
+
+
+class PEWorker:
+    def __init__(self):
+        self.proc, self.next_id, self.waiting, self.lock = None, 1, {}, None
+
+    async def start(self):
+        code, py = find_pe()
+        if not code:
+            raise RuntimeError("Piano Excerpts.app wasn't found on this Mac (expected on the Desktop in "
+                               "“Piano Excerpt Maker”).")
+        if not py:
+            raise RuntimeError("Open Piano Excerpts on the Mac once – it sets up the engine the iPad uses.")
+        env = dict(os.environ, PYTHONPATH=code, PYTHONUNBUFFERED="1")
+        self.proc = await asyncio.create_subprocess_exec(py, PE_WORKER, stdin=asyncio.subprocess.PIPE,
+                                                         stdout=asyncio.subprocess.PIPE, stderr=None, env=env,
+                                                         limit=1 << 26)
+        line = await asyncio.wait_for(self.proc.stdout.readline(), 120)
+        if not line:
+            self.proc = None
+            raise RuntimeError("The Piano Excerpts engine didn't start – details in ~/Library/Logs/KJD RX Bridge/bridge.log")
+        self.info = json.loads(line).get("result", {})
+        log("Piano Excerpts engine ready:", self.info)
+        asyncio.ensure_future(self.reader())
+
+    async def reader(self):
+        proc = self.proc
+        while True:
+            line = await proc.stdout.readline()
+            if not line:
+                break
+            try:
+                msg = json.loads(line)
+            except Exception:
+                continue
+            t = self.waiting.get(msg.get("id"))
+            if not t:
+                continue
+            if "progress" in msg:
+                if msg["progress"] is not None:
+                    t["progress"] = msg["progress"]
+                if msg.get("msg"):
+                    t["msg"] = msg["msg"]
+                continue
+            self.waiting.pop(msg.get("id"), None)
+            t["fut"].set_result(msg)
+        for t in list(self.waiting.values()):   # engine crashed: fail everything in flight
+            if not t["fut"].done():
+                t["fut"].set_result({"ok": False, "error": "The Piano Excerpts engine stopped – try again."})
+        self.waiting.clear()
+        if self.proc is proc:
+            self.proc = None
+
+    async def call(self, cmd, args, task):
+        if self.lock is None:
+            self.lock = asyncio.Lock()
+        async with self.lock:           # one job at a time; the engine keeps the open recording in memory
+            if self.proc is None or self.proc.returncode is not None:
+                task["msg"] = "Starting the Piano Excerpts engine…"
+                await self.start()
+            rid = self.next_id
+            self.next_id += 1
+            task["fut"] = asyncio.get_running_loop().create_future()
+            self.waiting[rid] = task
+            self.proc.stdin.write((json.dumps({"id": rid, "cmd": cmd, "args": args}) + "\n").encode())
+            await self.proc.stdin.drain()
+            return await task["fut"]
+
+
+PE = PEWorker()
+PE_TASKS = {}   # id -> {state, progress, msg, result, error, created}
+
+
+async def pe_run(cmd, args, task):
+    try:
+        msg = await PE.call(cmd, args, task)
+        if msg.get("ok"):
+            res = msg.get("result")
+            if cmd == "rx_prepare":          # open the copy in RX and watch it for ⌘S (same as clip jobs)
+                p = res["path"]
+                st = os.stat(p)
+                jid = uuid.uuid4().hex[:10]
+                JOBS[jid] = {"path": p, "name": os.path.basename(p), "project": "Piano Excerpts",
+                             "mtime": st.st_mtime_ns, "size": st.st_size, "version": 0, "created": time.time()}
+                open_in_rx(p)
+                res["job"] = jid
+            task.update(state="done", result=res, progress=1.0)
+        else:
+            task.update(state="error", error=msg.get("error") or "failed")
+    except Exception as e:
+        log("pe error:", repr(e))
+        task.update(state="error", error=str(e))
+    finally:
+        task.pop("fut", None)
+        now = time.time()
+        for k in [k for k, v in PE_TASKS.items() if now - v["created"] > 3600]:
+            PE_TASKS.pop(k, None)
+
+
+def pe_public(tid, t):
+    return {"task": tid, "state": t["state"], "progress": t.get("progress", 0), "msg": t.get("msg"),
+            "result": t.get("result"), "error": t.get("error")}
+
+
+def touch_protected_folders():
+    """Ask macOS for access to the usual recording places once, while you're at the Mac (after install/login)."""
+    for n in ("Desktop", "Documents", "Downloads"):
+        try:
+            os.listdir(os.path.expanduser("~/" + n))
+        except Exception as e:
+            log(f"no access to ~/{n} yet ({e.__class__.__name__}) – allow it in System Settings › Privacy & Security")
 
 
 # ---------------------------------------------------------------- tiny HTTP/1.1 + WebSocket server
@@ -412,9 +548,44 @@ async def handle(reader, writer):
                 vnc = True
             except Exception:
                 pass
+            pe_code, pe_py = find_pe()
             return await send(writer, 200, {"ok": True, "version": VERSION, "rx": bool(RX_APP) or DRY,
+                                             "piano_excerpts": bool(pe_code and pe_py),
                                              "rx_app": os.path.basename(RX_APP or "") or None, "screen_sharing": vnc, "audio": bool(os.path.exists(AUDIO_BIN.split()[0]) or shutil.which(AUDIO_BIN.split()[0])), "flac": bool(FLAC_TOOL),
                                              "host": os.uname().nodename}, req_headers=headers)
+        if path == "/api/pe/call" and method == "POST":   # Piano Excerpts page: start a job, reply at once if quick
+            cmd = re.sub(r"[^a-z_]", "", (q.get("cmd") or [""])[0])
+            body = await read_body(reader, headers)
+            args = json.loads(body or b"{}")
+            tid = uuid.uuid4().hex[:12]
+            t = PE_TASKS[tid] = {"state": "running", "progress": 0.0, "msg": None, "created": time.time()}
+            job = asyncio.ensure_future(pe_run(cmd, args, t))
+            try:
+                await asyncio.wait_for(asyncio.shield(job), float((q.get("wait") or ["1.5"])[0]))
+            except asyncio.TimeoutError:
+                pass
+            return await send(writer, 200, pe_public(tid, t), req_headers=headers)
+        m = re.fullmatch(r"/api/pe/task/([0-9a-f]{12})", path)
+        if m:
+            t = PE_TASKS.get(m.group(1))
+            if not t:
+                return await send(writer, 404, {"error": "unknown task (bridge restarted?)"}, req_headers=headers)
+            return await send(writer, 200, pe_public(m.group(1), t), req_headers=headers)
+        m = re.fullmatch(r"/api/pe/file/([0-9a-f]{12})", path)
+        if m:
+            t = PE_TASKS.get(m.group(1))
+            f = (t or {}).get("result") or {}
+            fp = f.get("file") if isinstance(f, dict) else None
+            if not fp or not os.path.realpath(fp).startswith(os.path.realpath(PE_TMP_PREFIX)) or not os.path.exists(fp):
+                return await send(writer, 404, {"error": "preview not found"}, req_headers=headers)
+            with open(fp, "rb") as fh:
+                data = fh.read()
+            try:
+                os.remove(fp)
+            except OSError:
+                pass
+            return await send(writer, 200, data, f.get("type", "application/octet-stream"),
+                              {"X-KJD-Rate": str(f.get("sr", ""))}, req_headers=headers)
         if path == "/api/upload" and method == "POST":  # one part of a chunked upload (resumable, shows progress)
             uid = re.sub(r"[^0-9a-zA-Z]", "", (q.get("id") or [""])[0])[:40]
             part = int((q.get("part") or ["0"])[0])
@@ -538,6 +709,8 @@ async def handle(reader, writer):
 
 async def main():
     os.makedirs(WORK, exist_ok=True)
+    if not DRY:
+        touch_protected_folders()
     srv = await asyncio.start_server(handle, "127.0.0.1", PORT, limit=1 << 20)
     log(f"{APP_NAME} {VERSION} on 127.0.0.1:{PORT} · RX: {RX_APP or 'not found'} · work folder: {WORK}")
     async with srv:

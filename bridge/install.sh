@@ -13,6 +13,7 @@ rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 curl -fsSL "$BASE/Info.plist" -o "$APP/Contents/Info.plist"
 curl -fsSL "$BASE/MacOS/KJD%20RX%20Bridge" -o "$APP/Contents/MacOS/KJD RX Bridge"
 curl -fsSL "$BASE/Resources/kjd_rx_bridge.py" -o "$APP/Contents/Resources/kjd_rx_bridge.py"
+curl -fsSL "$BASE/Resources/pe_worker.py" -o "$APP/Contents/Resources/pe_worker.py"
 chmod +x "$APP/Contents/MacOS/KJD RX Bridge"
 # live RX audio helper (ScreenCaptureKit) — compiled here with Apple's Command Line Tools
 if xcrun --find swiftc >/dev/null 2>&1; then

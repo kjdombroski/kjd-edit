@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<title>Piano Excerpts · KJD Edit</title>
+<meta name="theme-color" content="#1c1c1c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>
+/* Piano Excerpts page of KJD Edit — same Pro Tools-style dark window as the Edit page.
+   The audio and the heavy work stay on the studio Mac (KJD RX Bridge + the Piano Excerpts app's engine);
+   this page sends commands and plays light monitoring copies. */
+:root{--bg:#232323;--tb:#2d2d2d;--tb2:#353535;--panel:#2b2b2b;--edge:#151515;--field:#111;--text:#dcdcdc;--dim:#9a9a9a;
+--lane:#262626;--ctr:#f2f2f2;--blue:#3d8bfd;--play:#3f9a3f;--rx:#7a5ad6;--warn:#e9c43f;--red:#e0503c;
+--ui:"Helvetica Neue",Helvetica,Arial,sans-serif;--mono:Menlo,ui-monospace,monospace;color-scheme:dark}
+*{box-sizing:border-box;min-width:0;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font:12px/1.25 var(--ui);overflow:hidden;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
+#app{display:grid;grid-template-rows:auto auto 1fr auto;height:100dvh;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+button,select,input{font:inherit;color:var(--text)}
+button{background:linear-gradient(#4a4a4a,#3c3c3c);border:1px solid var(--edge);border-radius:3px;min-height:32px;padding:0 9px;cursor:pointer;white-space:nowrap}
+button:active{filter:brightness(1.25)}button:disabled{opacity:.4;pointer-events:none}
+button.on{background:linear-gradient(#4c8ff0,#2f6fd0);color:#fff}
+button.primary{background:linear-gradient(#4c8ff0,#2f6fd0);color:#fff;font-weight:bold}
+button.rec{background:linear-gradient(#d04a3a,#a8301f);color:#fff;font-weight:bold}
+button.rxb{background:linear-gradient(#7a5ad6,#5a3fb0);color:#fff;font-weight:bold}
+button.after{background:linear-gradient(#2f8f6f,#1f6f52);color:#fff;font-weight:bold}
+select,input[type=text],input[type=number],input[type=password]{background:var(--field);border:1px solid #000;border-radius:3px;min-height:32px;padding:0 6px;font-size:16px;-webkit-user-select:text;user-select:text}
+/* menu bar with page tabs */
+#menubar{display:flex;align-items:center;gap:4px;padding:0 8px;height:34px;background:#1c1c1c;border-bottom:1px solid #000;font-size:13px}
+#menubar .app{font-weight:bold;margin-right:8px}
+.tabs{display:flex;gap:2px;height:100%;align-items:flex-end}
+.tabs a{display:flex;align-items:center;height:28px;padding:0 14px;border:1px solid #000;border-bottom:0;border-radius:6px 6px 0 0;background:#2a2a2a;color:var(--dim);text-decoration:none;font-size:13px}
+.tabs a.on{background:var(--tb);color:#fff;font-weight:bold}
+.tabs a.soon{opacity:.45;pointer-events:none}
+#menubar .r{margin-left:auto;color:var(--dim);font:11px var(--mono);display:flex;gap:12px;align-items:center}
+#conn{display:flex;align-items:center;gap:5px}#conn i{width:8px;height:8px;border-radius:50%;background:#666;display:inline-block}
+#conn.ok i{background:#4caf50}#conn.bad i{background:var(--red)}
+/* toolbar */
+#tb{display:flex;flex-wrap:wrap;align-items:stretch;gap:6px;padding:5px 8px;background:var(--tb);border-bottom:1px solid #000}
+.blk{display:flex;align-items:center;gap:4px;padding:3px 6px;background:var(--tb2);border:1px solid #1d1d1d;border-radius:4px}
+.blk .lab{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:.5px;margin-right:2px}
+.ctr{display:flex;flex-direction:column;justify-content:center;background:var(--field);border:1px solid #000;border-radius:3px;padding:2px 10px;min-width:150px}
+.ctr .main{font:bold 20px var(--mono);color:var(--ctr);text-align:right}
+.ctr .sub{font:10px var(--mono);color:var(--dim);display:flex;justify-content:space-between;gap:8px}
+.transport button{min-width:42px;min-height:40px}
+.transport svg{width:16px;height:16px;fill:currentColor}
+#playBtn.on{background:linear-gradient(#4aa84a,#2f7f2f)}
+.sp{flex:1}
+#setLab{min-width:150px;max-width:260px;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+#lenPills button{min-width:52px;font:bold 12px var(--mono)}
+/* main */
+#main{display:grid;grid-template-columns:300px 1fr;min-height:0}
+#main.noside{grid-template-columns:0 1fr}
+#side{background:var(--panel);border-right:1px solid #000;overflow:auto;-webkit-overflow-scrolling:touch}
+#side section{border-bottom:1px solid #1a1a1a;padding:8px 10px}
+#side h5{margin:0 0 6px;font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.6px;display:flex;justify-content:space-between;align-items:center}
+.row{display:flex;gap:6px;align-items:center;margin:4px 0;flex-wrap:wrap}
+.row label{color:var(--dim);font-size:11px;min-width:62px}
+.row input[type=text]{width:84px}
+.pills{display:flex;gap:3px;flex-wrap:wrap}
+.pills button{min-height:30px;padding:0 8px;font-weight:bold}
+.pills button.dyn{font-style:italic;font-family:Georgia,serif;font-size:14px;min-width:36px}
+.wide{width:100%}
+.note{color:var(--dim);font-size:11px;line-height:1.4;margin:4px 0}
+.stat{font:11px var(--mono);color:var(--dim);line-height:1.6}
+#center{display:grid;grid-template-rows:auto 128px auto minmax(160px,1fr) auto minmax(110px,30%);min-height:0}
+.hdr{display:flex;align-items:center;gap:6px;padding:3px 8px;background:#333;border-bottom:1px solid #000;font-size:11px;color:var(--dim);min-height:30px}
+.hdr b{color:var(--text);font-size:11px;letter-spacing:.4px}
+.hdr button{min-height:26px;font-size:11px;padding:0 8px}
+canvas{display:block;width:100%;height:100%;touch-action:none}
+#ovWrap,#clipWrap{position:relative;background:var(--lane);border-bottom:1px solid #000;min-height:0}
+#clipWrap{background:#1f1f1f}
+#empty{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--dim);text-align:center;padding:20px;pointer-events:none}
+#empty b{color:var(--text);font-size:15px}#empty button{pointer-events:auto;min-height:40px;font-size:14px}
+#busy{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:#000c;border:1px solid #000;border-radius:8px;padding:12px 18px;display:none;min-width:260px;text-align:center;z-index:5}
+#busy.on{display:block}#busy .bar{height:6px;background:#333;border-radius:3px;margin-top:8px;overflow:hidden}#busy .bar i{display:block;height:100%;width:0;background:var(--blue);transition:width .2s}
+#clipBar{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:5px 8px;background:var(--tb);border-bottom:1px solid #000}
+#clipBar .g{display:flex;align-items:center;gap:4px;padding:2px 6px;background:var(--tb2);border:1px solid #1d1d1d;border-radius:4px}
+#clipBar .g span{font-size:10px;color:var(--dim)}
+#clipBar input[type=text]{width:96px;font:15px var(--mono)}
+#clipBar select{min-height:30px;font-size:13px}
+#clipBar .nud{min-width:34px;padding:0 4px;font-size:11px}
+#desc{flex-basis:100%;font-size:11px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#desc b{color:var(--text);font-style:italic;font-family:Georgia,serif;font-size:13px}
+#list{overflow:auto;background:#262626;-webkit-overflow-scrolling:touch}
+#list table{width:100%;border-collapse:collapse;font:12px var(--mono)}
+#list th{position:sticky;top:0;background:#333;color:var(--dim);font:10px var(--ui);text-transform:uppercase;text-align:left;padding:5px 6px;border-bottom:1px solid #000}
+#list td{padding:7px 6px;border-bottom:1px solid #1d1d1d;white-space:nowrap}
+#list tr.sel td{background:#d5d5d5;color:#111}
+#list tr.off td{opacity:.45}
+#list .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+#list .mk{font:italic 13px Georgia,serif}
+#list .inc{min-height:26px;min-width:36px;font-size:12px}
+#status{display:flex;gap:12px;padding:3px 10px;font:11px var(--mono);color:var(--dim);background:#141414;min-height:22px;align-items:center}
+#status #msg{color:var(--text);flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+/* dialogs */
+#dlg{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+#dlg.open{display:flex}
+#dlg .box{background:#2f2f2f;border:1px solid #000;border-radius:8px;padding:16px;min-width:340px;max-width:min(820px,100%);max-height:88dvh;overflow:auto;box-shadow:0 20px 60px #000a}
+#dlg h3{margin:0 0 10px;font-size:15px}
+#dlg .f{display:flex;flex-direction:column;gap:4px;margin:8px 0;color:var(--dim);font-size:12px}
+#dlg .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;flex-wrap:wrap}
+#dlg .btns button{min-height:38px;min-width:90px}
+#dlg p{color:var(--dim);font-size:12px;margin:6px 0;line-height:1.45}
+.fb{border:1px solid #000;border-radius:4px;background:#1d1d1d;max-height:52dvh;overflow:auto;-webkit-overflow-scrolling:touch}
+.fb .it{display:flex;align-items:center;gap:8px;padding:9px 10px;border-bottom:1px solid #2a2a2a;font-size:14px;cursor:pointer}
+.fb .it:active{background:#333}.fb .it.pick{background:var(--blue);color:#fff}
+.fb .it small{margin-left:auto;color:var(--dim);font:11px var(--mono)}.fb .it.pick small{color:#eee}
+.fb .ic{width:22px;text-align:center}
+.crumb{font:11px var(--mono);color:var(--dim);margin:4px 0 8px;overflow-wrap:anywhere}
+/* RX window (Mac screen) */
+#rxw{position:fixed;left:2vw;top:5vh;width:96vw;height:88dvh;background:#111;border:1px solid #000;border-radius:8px;box-shadow:0 20px 60px #000c;z-index:46;display:none;flex-direction:column;overflow:hidden}
+#rxw.open{display:flex}#rxw.min{height:46px!important}#rxw.min #rxScreen{display:none}
+#rxw .rxh{display:flex;align-items:center;gap:6px;padding:5px 8px;background:#3a3a3a;border-bottom:1px solid #000;flex-wrap:wrap}
+#rxw .rxh button{min-height:32px;font-size:12px}
+#rxw .pill{font-size:11px;background:#1b1b1b;border:1px solid #000;border-radius:10px;padding:3px 9px;color:var(--warn);max-width:46vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#rxw .cn{font-size:11px;color:var(--dim)}
+#rxScreen{flex:1;min-height:0;background:#000;position:relative;overflow:hidden}
+#rxScreen>div{background:#000!important}
+#toast{position:fixed;left:50%;bottom:40px;transform:translateX(-50%);background:#000d;border:1px solid #000;border-radius:8px;padding:10px 16px;font-size:13px;z-index:60;display:none;max-width:80vw;text-align:center}
+#toast.on{display:block}
+@media (max-width:900px){#main{grid-template-columns:250px 1fr}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="menubar">
+    <span class="app">KJD Edit</span>
+    <nav class="tabs" aria-label="Pages">
+      <a href="./" id="tabEdit">Edit</a><a class="on" href="excerpts.html" aria-current="page">Piano Excerpts</a><a class="soon" title="Coming next">Batch Master</a>
+    </nav>
+    <div class="r"><span id="conn" title="Connection to your studio Mac"><i></i><span id="connTxt">Mac: not paired</span></span><span id="sessName">No session</span><span>PE v<span id="ver"></span></span></div>
+  </div>
+  <header id="tb">
+    <div class="blk"><button id="openBtn" title="Open a recording or session on the Mac (⌘O)">Open…</button><button id="saveBtn" title="Save session (⌘S)">Save</button><button id="undoBtn" title="Undo (⌘Z)">↶</button><button id="redoBtn" title="Redo (⇧⌘Z)">↷</button></div>
+    <div class="blk"><button id="findBtn" class="primary" title="Find excerpts with the settings on the left">Find Excerpts</button></div>
+    <div class="ctr"><div class="sub"><span id="ctrLab">MAIN</span><span id="ctrSel">SEL —</span></div><div class="main" id="ctrMain">0:00.000</div></div>
+    <div class="blk transport">
+      <button id="prevBtn" title="Previous excerpt (←)" aria-label="Previous excerpt"><svg viewBox="0 0 16 16"><path d="M2 2h2v12H2zM14 2v12L5 8z"/></svg></button>
+      <button id="stopBtn" title="Stop (Space)" aria-label="Stop"><svg viewBox="0 0 16 16"><path d="M3 3h10v10H3z"/></svg></button>
+      <button id="playBtn" title="Play / pause (Space)" aria-label="Play"><svg viewBox="0 0 16 16" id="playIco"><path d="M3 2v12l11-6z"/></svg></button>
+      <button id="nextBtn" title="Next excerpt (→)" aria-label="Next excerpt"><svg viewBox="0 0 16 16"><path d="M12 2h2v12h-2zM2 2v12l9-6z"/></svg></button>
+      <button id="retBtn" title="On: playhead returns to where playback started. Off: stays where you stop. Tap after stopping to change that stop too.">↩ Return</button>
+    </div>
+    <div class="blk"><span class="lab">Results</span><button id="setPrev" aria-label="Previous results">◀</button><span id="setLab">—</span><button id="setNext" aria-label="Next results">▶</button></div>
+    <div class="blk" id="lenBlk"><span class="lab">Length</span><span id="lenPills" class="pills"></span></div>
+    <div class="sp"></div>
+    <div class="blk"><button id="abBtn" title="Compare the original recording with the RX-processed one">RX: BEFORE</button><button id="rxBtn" class="rxb" title="Open the whole recording in iZotope RX 12 on the Mac and see the Mac screen">RX 12</button></div>
+    <div class="blk"><button id="exportBtn" class="rec" title="Export to the session's Bounced Excerpts folder on the Mac">● Export</button></div>
+  </header>
+  <div id="main">
+    <aside id="side">
+      <section><h5>Find <button id="sideHide" style="min-height:22px;font-size:10px">Hide ◀</button></h5>
+        <div class="row"><label>Length</label><input type="text" id="sLength" inputmode="decimal" placeholder="1:00"><label style="min-width:0">Count</label><input type="text" id="sCount" inputmode="numeric" style="width:54px"></div>
+        <div class="row"><label>Tolerance</label><input type="text" id="sTol" inputmode="decimal" style="width:54px"><span class="note">%</span></div>
+      </section>
+      <section><h5>Intensity</h5>
+        <div class="pills" id="intPills"></div>
+      </section>
+      <section><h5>Dynamic order <span style="text-transform:none;letter-spacing:0">(optional)</span></h5>
+        <div class="pills" id="ordPills"></div>
+        <div class="row"><input type="text" id="sOrdCustom" class="wide" placeholder="p mf f p" autocapitalize="off" autocorrect="off"></div>
+      </section>
+      <section><h5>Alternate length</h5>
+        <div class="row"><input type="text" id="sAlt" inputmode="decimal" placeholder="0:30" style="width:84px"><button id="makeAlt">Make</button></div>
+        <div class="note">Makes the best shorter (or longer) version inside each current excerpt, keeping your fades and choices. Switch with LENGTH above.</div>
+      </section>
+      <section><h5>Fades &amp; output</h5>
+        <div class="row"><label>Fade in</label><input type="text" id="sFi" inputmode="decimal" style="width:60px"><label style="min-width:0">out</label><input type="text" id="sFo" inputmode="decimal" style="width:60px"><span class="note">s</span></div>
+        <div class="row"><label>Normalize</label><input type="text" id="sNorm" inputmode="decimal" placeholder="off" style="width:60px"><span class="note">LUFS (blank = off)</span></div>
+        <div class="row"><label>Preview</label><select id="sPrev"><option value="aac">AAC (light, for remote)</option><option value="flac">Lossless (FLAC)</option></select></div>
+      </section>
+      <section><h5>iZotope RX 12 · whole recording</h5>
+        <div class="row"><button id="rxOpenBtn" class="rxb wide">Open whole recording in RX 12</button></div>
+        <div class="note">On the Mac screen: ⌘A → Azimuth Learn → Render → Phase Learn → Render (add anything else) → ⌘S. It comes back as <b>RX: AFTER</b>. Keep the same length and sample rate.</div>
+        <div class="stat" id="rxInfo">No RX version yet.</div>
+      </section>
+      <section><h5>Recording</h5><div class="stat" id="anInfo">—</div></section>
+      <section><h5>Mac</h5><div class="row"><button id="pairBtn">Pair with Mac…</button></div><div class="note">Uses the same KJD RX Bridge as the Edit page. Your WAV files never leave the Mac; this page plays light monitoring copies.</div></section>
+    </aside>
+    <div id="center">
+      <div class="hdr"><button id="sideShow" style="display:none">▶ Settings</button><b>OVERVIEW</b><span id="ovInfo"></span><span class="sp"></span><span id="legend" style="font:italic 12px Georgia,serif"></span></div>
+      <div id="ovWrap"><canvas id="ov"></canvas>
+        <div id="empty"><b>Open a recording on your studio Mac</b><span>Choose a WAV (or an L/R pair) or a saved .pxs session. Analysis, RX and export run on the Mac — the same engine as the Piano Excerpts app.</span><button id="openBtn2">Open…</button></div>
+      </div>
+      <div class="hdr"><b>CLIP</b><span id="clipInfo">—</span><span class="sp"></span><button id="zOut" aria-label="Zoom out">−</button><button id="zIn" aria-label="Zoom in">+</button><button id="zFit">Fit</button></div>
+      <div id="clipWrap"><canvas id="clip"></canvas><div id="busy"><span id="busyTxt">Working…</span><div class="bar"><i id="busyBar"></i></div></div></div>
+      <div id="clipBar">
+        <div class="g"><span>Start</span><button class="nud" data-n="start,-0.1">−.1</button><input type="text" id="fStart"><button class="nud" data-n="start,0.1">+.1</button></div>
+        <div class="g"><span>End</span><button class="nud" data-n="end,-0.1">−.1</button><input type="text" id="fEnd"><button class="nud" data-n="end,0.1">+.1</button></div>
+        <div class="g"><span>Len</span><b id="fLen" style="font:13px var(--mono)">—</b></div>
+        <div class="g"><span>Fade in</span><input type="text" id="fFi" style="width:58px" inputmode="decimal"><select id="cIn"></select></div>
+        <div class="g"><span>Fade out</span><input type="text" id="fFo" style="width:58px" inputmode="decimal"><select id="cOut"></select></div>
+        <button id="incBtn" class="on">Included</button><button id="resetBtn" title="Back to the found position and fades">Reset</button><button id="fadesAllBtn" title="Use this excerpt's fades and curves on every excerpt">Fades → all</button>
+        <div id="desc">—</div>
+      </div>
+      <div id="list"><table><thead><tr><th>#</th><th>Start</th><th>End</th><th>Length</th><th>Dyn</th><th>Contour</th><th>Shape</th><th>Fades</th><th></th></tr></thead><tbody id="listBody"></tbody></table></div>
+    </div>
+  </div>
+  <div id="status"><span id="msg">Ready</span><span id="sideTxt"></span><span id="saveTxt"></span></div>
+</div>
+<div id="dlg"><div class="box" id="dlgBox"></div></div>
+<div id="rxw" role="dialog" aria-label="iZotope RX 12 on your Mac"><div class="rxh"><b>RX 12 · Mac</b><span id="rxStat" class="pill">Idle</span><span id="rxConn" class="cn"></span><span class="sp" style="flex:1"></span>
+  <button id="rxSave" title="Presses ⌘S in RX for you (needs Accessibility permission for KJD RX Bridge on the Mac)">⌘S in RX</button><button id="rxScrollUp">▲</button><button id="rxScrollDn">▼</button><button id="rxRe">Reconnect</button><button id="rxMin">—</button><button id="rxClose">Close</button></div>
+  <div id="rxScreen"></div></div>
+<div id="toast"></div>
+<script>
+"use strict";
+const VERSION="0.1.0";
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+$("ver").textContent=VERSION;
+const MARKS=["pp","p","mp","mf","f","ff"];
+const CURVES=["linear","equal power","s-curve","slow (exp)","fast (log)"];
+const CURVE_F={"linear":t=>t,"equal power":t=>Math.sin(t*Math.PI/2),"s-curve":t=>0.5-0.5*Math.cos(t*Math.PI),"slow (exp)":t=>Math.pow(t,2.5),"fast (log)":t=>1-Math.pow(1-t,2.5)};
+const COLORS=["#4f8fe6","#e6a14f","#5fc46b","#d35fd0","#e65f5f","#4fd1c5","#c9c94f","#8f7be6","#e67fa8","#7fbf4f"];
+const exColor=n=>COLORS[(n-1+COLORS.length*10)%COLORS.length];
+const DYN_COL=p=>{const h=220-200*p;return `hsl(${h},55%,${42+10*p}%)`};
+function tc(t,ms=true){t=Math.max(0,t||0);const h=Math.floor(t/3600),m=Math.floor(t/60)%60,s=t%60;const ss=ms?s.toFixed(3).padStart(6,"0"):String(Math.floor(s)).padStart(2,"0");return (h?h+":"+String(m).padStart(2,"0"):m)+":"+ss}
+function parseT(v){v=String(v).trim();if(!v)return NaN;if(v.includes(":")){let s=0;for(const p of v.split(":"))s=s*60+parseFloat(p);return s}return parseFloat(v)}
+const lenLab=s=>{const r=Math.round(s);return Math.floor(r/60)+":"+String(r%60).padStart(2,"0")};
+function msg(t){$("msg").textContent=t}
+let toastT=null;function toast(t,ms=2600){$("toast").textContent=t;$("toast").classList.add("on");clearTimeout(toastT);toastT=setTimeout(()=>$("toast").classList.remove("on"),ms)}
+
+// ---------------- dialogs ----------------
+let dlgRes=null;
+function dialog(title,body,btns,primary){$("dlgBox").innerHTML=`<h3>${title}</h3>${body}<div class="btns">${btns.map((b,i)=>`<button data-r="${esc(b)}" class="${(primary?b===primary:i===btns.length-1)?"primary":""}">${esc(b)}</button>`).join("")}</div>`;
+  $("dlg").classList.add("open");return new Promise(r=>dlgRes=r)}
+function closeDlg(r){$("dlg").classList.remove("open");const f=dlgRes;dlgRes=null;f&&f(r)}
+$("dlg").addEventListener("click",e=>{const b=e.target.closest("button[data-r]");if(b)closeDlg(b.dataset.r);else if(e.target.id==="dlg")closeDlg("Cancel")});
+
+// ---------------- bridge (shared pairing with the Edit page) ----------------
+let cfg=(()=>{try{return JSON.parse(localStorage.getItem("kjd-rx")||"{}")}catch(e){return {}}})();
+const saveCfg=()=>{try{localStorage.setItem("kjd-rx",JSON.stringify(cfg))}catch(e){}};
+const base=()=>(cfg.url||"").trim().replace(/\/+$/,"");
+const paired=()=>!!(base()&&cfg.token);
+// "simple" requests only (token in the query, text body) so Safari never needs a CORS preflight
+async function bfetch(path,opt={}){if(!paired())throw new Error("Pair with the Mac first");const u=base()+path+(path.includes("?")?"&":"?")+"token="+encodeURIComponent(cfg.token||"");
+  const r=await fetch(u,Object.assign({cache:"no-store"},opt));if(!r.ok){let m="HTTP "+r.status;try{m=(await r.json()).error||m}catch(e){}throw new Error(m)}return r}
+function setConn(state,t){$("conn").className=state||"";$("connTxt").textContent=t}
+async function pe(cmd,args={},onp,wait=1.5){
+  let r=await (await bfetch(`/api/pe/call?cmd=${cmd}&wait=${wait}`,{method:"POST",body:JSON.stringify(args)})).json(),fails=0;
+  while(r.state==="running"){onp&&onp(r.progress,r.msg);await sleep(450);
+    try{r=await (await bfetch("/api/pe/task/"+r.task)).json();fails=0}catch(e){if(/unknown task/.test(e.message))throw new Error("The Mac bridge restarted during this step – try again");if(++fails>20)throw e;await sleep(1000)}}
+  setConn("ok","Mac: connected");
+  if(r.state==="error")throw new Error(r.error||"failed");return Object.assign({_task:r.task},r.result||{})}
+async function pingMac(){if(!paired()){setConn("","Mac: not paired");return null}
+  try{const j=await (await bfetch("/api/ping")).json();setConn("ok","Mac: "+j.host);
+    if(j.piano_excerpts===undefined){setConn("bad","Update KJD RX Bridge on the Mac");return j}
+    if(!j.piano_excerpts)setConn("bad","Mac: Piano Excerpts engine not found");return j}
+  catch(e){setConn("bad",/token|401/.test(e.message)?"Mac: pairing code wrong":"Mac: offline");return null}}
+function pairDialog(){dialog("Pair with your studio Mac",`<p>On the Mac, open <b>KJD RX Bridge</b> and tap <b>Copy Pairing Code</b>, then paste it here. (Same pairing as the Edit page — if you've paired there, you're already set.)</p>
+  <div class="f">Pairing code<input type="text" id="pU" value="${esc(base()?base()+(cfg.token?"#"+cfg.token:""):"")}" placeholder="https://your-mac.tailnet.ts.net#token" autocapitalize="off" autocorrect="off"></div>
+  <div class="f">Mac user name (for the RX screen)<input type="text" id="pN" value="${esc(cfg.user||"")}" autocapitalize="off" autocorrect="off"></div>
+  <div class="f">Mac password<input type="password" id="pP" value="${esc(cfg.pass||"")}"></div>
+  <p>Needs Tailscale on (iPad and Mac). Bridge 0.3.0 or newer — update on the Mac with:<br><code style="user-select:text;-webkit-user-select:text">curl -fsSL https://kjdombroski.github.io/kjd-edit/bridge/install.sh | bash</code></p>`,["Cancel","Save"]).then(async r=>{
+  if(r!=="Save")return;let u=$("pU").value.replace(/[​-‍﻿\s]+/g,"");const i=u.indexOf("#");if(i>=0){cfg.token=u.slice(i+1).trim();u=u.slice(0,i)}if(u&&!/^https?:\/\//.test(u))u="https://"+u;
+  cfg.url=u;cfg.user=$("pN").value.trim();cfg.pass=$("pP").value;saveCfg();const j=await pingMac();toast(j?"Connected to "+j.host:"Couldn't reach the Mac – check Tailscale and the code")})}
+
+// ---------------- state ----------------
+const DEF={length:"1:00",count:"5",intensity:"any",tolerance:"10",fade_in:"0.05",fade_out:"1.5",normalize:"",order:"off",order_custom:"p mf f p",alt_length:"0:30",preview:"aac"};
+let S=blank();
+function blank(){return {an:null,sources:[],session:null,name:null,sets:[],cur:0,sel:0,settings:Object.assign({},DEF),rx_full:null,side:"before",inserts:0,dirty:false,rxJob:null,ret:true}}
+const curSet=()=>S.sets.find(s=>s.id===S.cur)||null;
+const exs=()=>(curSet()||{exs:[]}).exs;
+const cx=()=>exs()[S.sel]||null;
+const rootOf=id=>{const s=S.sets.find(x=>x.id===id);return s&&s.meta&&s.meta.root!=null?+s.meta.root:id};
+const family=id=>S.sets.filter(s=>rootOf(s.id)===rootOf(id));
+const DUR=()=>S.an?S.an.duration:0;
+let undoS=[],redoS=[];
+const clone=o=>JSON.parse(JSON.stringify(o));
+function snap(){undoS.push(clone({cur:S.cur,sel:S.sel,sets:S.sets.map(s=>({id:s.id,label:s.label,meta:s.meta,exs:s.exs}))}));if(undoS.length>200)undoS.shift();redoS=[]}
+function restoreSnap(o){const changes=new Map(S.sets.map(s=>[s.id,s.changes||[]]));S.sets=o.sets.map(s=>Object.assign(s,{changes:changes.get(s.id)||[]}));S.cur=o.cur;S.sel=Math.min(o.sel,Math.max(0,exs().length-1))}
+function doUndo(re){const from=re?redoS:undoS,to=re?undoS:redoS;if(!from.length)return msg(re?"Nothing to redo":"Nothing to undo");
+  to.push(clone({cur:S.cur,sel:S.sel,sets:S.sets.map(s=>({id:s.id,label:s.label,meta:s.meta,exs:s.exs}))}));restoreSnap(from.pop());changed(re?"Redo":"Undo",true);clipFit();msg(re?"Redo":"Undo")}
+function changed(label,noSnapLabel){const s=curSet();if(s){s.changes=s.changes||[];s.changes.push({label,time:new Date().toTimeString().slice(0,8),exs:clone(s.exs.map(stripEx))});if(s.changes.length>300)s.changes.splice(0,s.changes.length-300)}
+  S.dirty=true;persist();renderAll()}
+const stripEx=e=>{const o={};for(const k of ["start","end","fade_in","fade_out","curve_in","curve_out","enabled","rx_path","rx_t0","number","rank","score","nominal","_orig"])o[k]=e[k]===undefined?null:e[k];return o};
+// local copy of unsaved work so Safari reloads never lose edits
+let persistT=null;
+function persist(){clearTimeout(persistT);persistT=setTimeout(()=>{try{const o=Object.assign({},S);o.an=S.an?{path:S.an.path}:null;localStorage.setItem("kjd-pe-state",JSON.stringify(o));
+  if(S.an)localStorage.setItem("kjd-pe-an",JSON.stringify(S.an))}catch(e){}},250);$("saveTxt").textContent=S.dirty?"● unsaved":(S.session?"saved":"")}
+function loadLocal(){try{const o=JSON.parse(localStorage.getItem("kjd-pe-state")||"null");const an=JSON.parse(localStorage.getItem("kjd-pe-an")||"null");if(o&&an&&o.an&&an.path===o.an.path){o.an=an;return o}}catch(e){}return null}
+
+// ---------------- settings panel ----------------
+const FIELDS={sLength:"length",sCount:"count",sTol:"tolerance",sOrdCustom:"order_custom",sAlt:"alt_length",sFi:"fade_in",sFo:"fade_out",sNorm:"normalize",sPrev:"preview"};
+function fillSettings(){for(const [id,k] of Object.entries(FIELDS))$(id).value=S.settings[k]??DEF[k];drawPills()}
+for(const [id,k] of Object.entries(FIELDS))$(id).addEventListener("change",()=>{S.settings[k]=$(id).value.trim();S.dirty=S.dirty||!!S.an;persist()});
+function drawPills(){
+  $("intPills").innerHTML=["any","varied","peak"].concat(MARKS).map(v=>`<button data-int="${v}" class="${MARKS.includes(v)?"dyn":""} ${S.settings.intensity===v?"on":""}">${v}</button>`).join("");
+  $("ordPills").innerHTML=[["off","Off"],["crescendo","↗"],["diminuendo","↘"],["arch","⌒"],["valley","⌣"],["custom","Custom"]].map(([v,l])=>`<button data-ord="${v}" title="${v}" class="${S.settings.order===v?"on":""}">${l}</button>`).join("");
+  $("sOrdCustom").disabled=S.settings.order!=="custom";$("sOrdCustom").style.opacity=S.settings.order==="custom"?1:.4}
+$("intPills").addEventListener("click",e=>{const b=e.target.closest("[data-int]");if(!b)return;S.settings.intensity=b.dataset.int;drawPills();persist()});
+$("ordPills").addEventListener("click",e=>{const b=e.target.closest("[data-ord]");if(!b)return;S.settings.order=b.dataset.ord;drawPills();persist()});
+function orderArg(){const o=S.settings.order;return o==="off"?null:o==="custom"?S.settings.order_custom:o}
+for(const id of ["cIn","cOut"])$(id).innerHTML=CURVES.map(c=>`<option>${c}</option>`).join("");
+$("sideHide").onclick=()=>{$("main").classList.add("noside");$("sideShow").style.display="";setTimeout(resize,0)};
+$("sideShow").onclick=()=>{$("main").classList.remove("noside");$("sideShow").style.display="none";setTimeout(resize,0)};
+
+// ---------------- busy overlay ----------------
+let busyN=0;
+function busy(on,t,p){if(on){busyN++;$("busy").classList.add("on");$("busyTxt").textContent=t||"Working…";$("busyBar").style.width=Math.round((p||0)*100)+"%"}else{busyN=Math.max(0,busyN-1);if(!busyN)$("busy").classList.remove("on")}}
+const prog=title=>(p,m)=>{$("busyTxt").textContent=(m||title);if(p!=null)$("busyBar").style.width=Math.round(p*100)+"%";msg((m||title)+(p!=null?` ${Math.round(p*100)}%`:""))};
+async function run(title,fn){busy(true,title);try{return await fn(prog(title))}catch(e){msg(title+" – "+e.message);await dialog("Couldn't finish",`<p>${esc(title)}:</p><p style="color:var(--text)">${esc(e.message)}</p>`,["OK"]);return null}finally{busy(false)}}
+
+// ---------------- open / save ----------------
+let fbPicks=[];
+async function openDialog(path){if(!paired())return pairDialog();
+  const j=await run("Reading the Mac's folders",()=>pe("browse",{path:path||""}));if(!j)return;fbPicks=fbPicks.filter(p=>j.entries.some(e=>e.path===p));
+  const it=e=>`<div class="it ${fbPicks.includes(e.path)?"pick":""}" data-p="${esc(e.path)}" data-d="${e.dir?1:0}"><span class="ic">${e.dir?"📁":/\.pxs$/i.test(e.name)?"🎹":"〰︎"}</span>${esc(e.name)}<small>${e.dir?"":e.size?(e.size/1048576).toFixed(1)+" MB":""}</small></div>`;
+  const body=`<div class="crumb">${j.path?esc(j.path):"Your Mac"}</div>${j.recent&&j.recent.length?`<p>Recent sessions</p><div class="fb">${j.recent.map(it).join("")}</div><p>Places</p>`:""}
+   <div class="fb" id="fbList">${j.parent!=null?`<div class="it" data-p="${esc(j.parent)}" data-d="1"><span class="ic">⬆︎</span>Back</div>`:""}${j.entries.map(it).join("")||'<div class="it" style="color:var(--dim)">No audio or sessions here</div>'}</div>
+   <p>Tap a <b>.pxs</b> session to open it, or tap one recording (or a matching L and R pair) and then <b>Open Recording</b>.</p>`;
+  const pr=dialog("Open from the Mac",body,["Cancel","Open Recording"]);
+  $("dlgBox").addEventListener("click",function h(e){const r=e.target.closest(".it[data-p]");if(!r)return;e.stopPropagation();const p=r.dataset.p;
+    if(r.dataset.d==="1"){$("dlgBox").removeEventListener("click",h);closeDlg("_nav");openDialog(p);return}
+    if(/\.pxs$/i.test(p)){$("dlgBox").removeEventListener("click",h);closeDlg("_nav");openSession(p);return}
+    if(fbPicks.includes(p))fbPicks=fbPicks.filter(x=>x!==p);else{fbPicks.push(p);if(fbPicks.length>2)fbPicks.shift()}
+    $("dlgBox").querySelectorAll(".it[data-p]").forEach(x=>x.classList.toggle("pick",fbPicks.includes(x.dataset.p)))});
+  const r=await pr;if(r==="Open Recording"){if(!fbPicks.length)return toast("Tap a recording first");const p=fbPicks.slice();fbPicks=[];openAudio(p)}}
+async function confirmDiscard(){if(!S.dirty||!S.an)return true;const r=await dialog("Unsaved changes",`<p>Save the changes to “${esc(S.name||S.an.name)}” first?</p>`,["Cancel","Don't Save","Save"]);
+  if(r==="Cancel")return false;if(r==="Save")return await save();return true}
+async function openAudio(paths){if(!await confirmDiscard())return;stop();
+  const j=await run("Opening recording",p=>pe("open_audio",{paths},p,1));if(!j)return;
+  S=blank();S.settings=Object.assign({},DEF,loadPrefs());S.an=j.analysis;S.sources=j.sources;undoS=[];redoS=[];audioCache.clear();
+  S.dirty=false;fillSettings();ovFit();renderAll();persist();msg(`Opened ${S.an.name} — set length and intensity, then Find Excerpts`)}
+async function openSession(path){if(!await confirmDiscard())return;stop();
+  const j=await run("Opening session",p=>pe("open_session",{path},p,1));if(!j)return;
+  S=blank();S.an=j.analysis;S.session=j.session;S.name=j.name;S.sets=j.sets.map(s=>Object.assign(s,{changes:[]}));S.cur=j.cur_set;
+  S.settings=Object.assign({},DEF,j.settings);S.rx_full=j.rx_full;S.side=j.rx_side;S.inserts=j.inserts;S.sel=Math.min(j.sel||0,Math.max(0,exs().length-1));
+  for(const s of S.sets)for(const e of s.exs)if(!e._orig)e._orig=[e.start,e.end,e.fade_in,e.fade_out,e.curve_in,e.curve_out];
+  undoS=[];redoS=[];audioCache.clear();fillSettings();ovFit();clipFit();renderAll();persist();
+  msg(`Opened session “${S.name}” — ${exs().length} excerpts, ${S.sets.length} result set(s), ${j.history_len} history points`);
+  if(S.inserts)toast(`This session has ${S.inserts} insert plugin(s): they're used when exporting on the Mac, not in iPad previews or iPad exports.`,5000)}
+async function save(asNew){if(!S.an)return false;let args={sets:S.sets.map(s=>({id:s.id,label:s.label,meta:s.meta,exs:s.exs.map(stripEx),changes:s.changes||[]})),
+  cur_set:S.cur,sel:S.sel,settings:Object.assign({},S.settings)};
+  if(!S.session||asNew){const stem=(S.an.name||"Session").replace(/\.[^.]+$/,"");const folder=S.an.path.replace(/\/[^/]*$/,"");
+    const r=await dialog("Save session",`<p>A project folder is made next to the recording (like the Mac app): the session, <b>Bounced Excerpts</b>, <b>RX Files</b> and backups.</p>
+      <div class="f">Session name<input type="text" id="svN" value="${esc(S.name||stem)}"></div><div class="crumb">in ${esc(folder)}</div>`,["Cancel","Save"]);
+    if(r!=="Save")return false;Object.assign(args,{name:$("svN").value.trim()||stem,folder})}
+  let j=await run("Saving session on the Mac",()=>pe("save_session",args).catch(async e=>{if(/^EXISTS:/.test(e.message)){const r=await dialog("Replace session?",`<p>${esc(e.message.slice(7))} already exists.</p>`,["Cancel","Replace"]);if(r==="Replace")return pe("save_session",Object.assign(args,{overwrite:true}));return null}throw e}));
+  if(!j)return false;S.session=j.session;S.name=j.name;S.dirty=false;for(const s of S.sets)s.changes=[];persist();renderAll();msg(`✓ Saved “${j.name}” on the Mac (${j.history_len} history points — opens on the Mac with everything)`);return true}
+function loadPrefs(){try{return JSON.parse(localStorage.getItem("kjd-pe-prefs")||"{}")}catch(e){return {}}}
+function savePrefs(){try{const o={};for(const k of ["length","count","intensity","tolerance","fade_in","fade_out","normalize","order","order_custom","alt_length","preview"])o[k]=S.settings[k];localStorage.setItem("kjd-pe-prefs",JSON.stringify(o))}catch(e){}}
+
+// ---------------- find / alternates / sets ----------------
+const nextSetId=()=>Math.max(-1,...S.sets.map(s=>s.id))+1;
+async function find(){if(!S.an)return openDialog();stop();const st=S.settings;
+  if(isNaN(parseT(st.length))||parseT(st.length)<2)return toast("Length looks wrong — use 60, 90 or 1:30");
+  savePrefs();const j=await run("Finding excerpts",p=>pe("find",{length:st.length,count:+st.count||5,intensity:st.intensity,tolerance:+st.tolerance||10,order:orderArg(),fade_in:+st.fade_in||0.05,fade_out:st.fade_out===""?1.5:+st.fade_out},p));if(!j)return;
+  snap();const id=nextSetId(),od=orderArg()?" · "+orderArg():"";for(const e of j.exs)e._orig=[e.start,e.end,e.fade_in,e.fade_out,e.curve_in,e.curve_out];
+  S.sets.push({id,label:`${j.exs.length} × ${st.length} · ${st.intensity}${od}`,meta:{length:j.length,root:id},exs:j.exs,changes:[]});S.cur=id;S.sel=0;
+  changed(`Find · ${j.exs.length} × ${st.length} (${st.intensity}${od})`);clipFit();msg(`Found ${j.exs.length} excerpt(s). Tap one to fine-tune; Space plays it.`)}
+async function makeAlt(){if(!exs().length)return toast("Find excerpts first — alternates are made from them");const L=parseT(S.settings.alt_length);if(!(L>=2))return toast("Alternate length must look like 30, 0:30 or 1:30");
+  const lab=lenLab(L),ex=family(S.cur).find(s=>s.meta&&s.meta.length===lab);if(ex){goSet(ex.id);return toast(`A ${lab} version already exists — switched to it`)}
+  stop();savePrefs();const parent=curSet();const j=await run(`Making ${lab} alternates`,p=>pe("alternates",{parents:exs().map(stripEx),length:S.settings.alt_length,intensity:S.settings.intensity,order:orderArg()},p));if(!j)return;
+  snap();const id=nextSetId();for(const e of j.exs)e._orig=[e.start,e.end,e.fade_in,e.fade_out,e.curve_in,e.curve_out];
+  S.sets.push({id,label:`${j.exs.length} × ${lab} · alternate`,meta:{length:lab,root:rootOf(parent.id)},exs:j.exs,changes:[]});S.cur=id;
+  changed(`Alternate · ${lab} from the ${(parent.meta||{}).length||""} excerpts`);clipFit();msg(`Made ${j.exs.length} × ${lab} alternates — switch lengths with the LENGTH pills`)}
+function goSet(id){if(id===S.cur)return;stop();S.cur=id;S.sel=Math.min(S.sel,Math.max(0,exs().length-1));persist();clipFit();renderAll();msg("Results: "+(curSet().label||""))}
+function stepSet(d){const ids=S.sets.map(s=>s.id),i=ids.indexOf(S.cur)+d;if(i>=0&&i<ids.length)goSet(ids[i])}
+
+// ---------------- descriptions (after trims) ----------------
+let descT=null;
+function refreshDesc(e){clearTimeout(descT);descT=setTimeout(async()=>{try{const j=await pe("describe",{spans:[[e.start,e.end]]});e.description=j.items[0];renderList();renderClipBar()}catch(err){}},500)}
+
+// ---------------- audio (monitoring copies from the Mac) ----------------
+let actx=null;const audioCache=new Map();const HANDLE=3;
+function ac(){if(!actx){actx=new (window.AudioContext||window.webkitAudioContext)({latencyHint:"interactive"})}if(actx.state==="suspended")actx.resume();return actx}
+const sideKey=()=>S.side==="after"&&S.rx_full?"A":"B";
+function cacheFor(e){if(!e)return null;for(const v of audioCache.values())if(v.side===sideKey()&&v.rx===(e.rx_path||"")&&v.t0<=e.start-0.05&&v.t1>=e.end+0.05&&v.buf)return v;return null}
+async function loadAudio(e,quiet){if(!e)return null;const hit=cacheFor(e);if(hit)return hit;
+  const t0=Math.max(0,e.start-HANDLE),t1=Math.min(DUR(),e.end+HANDLE),key=`${sideKey()}|${t0.toFixed(2)}|${t1.toFixed(2)}|${e.rx_path||""}`;
+  if(audioCache.has(key))return audioCache.get(key).p;
+  const ent={side:sideKey(),rx:e.rx_path||"",t0,t1,buf:null};ent.p=(async()=>{
+    if(!quiet)busy(true,"Loading audio from the Mac");
+    try{const j=await pe("audio",{start:t0,end:t1,ex:e.rx_path?stripEx(e):null,fmt:S.settings.preview||"aac",mono:!!cfg.low},quiet?null:prog("Preparing audio on the Mac"),6);
+      const r=await bfetch("/api/pe/file/"+j._task);const total=+r.headers.get("Content-Length")||0;const rd=r.body.getReader(),parts=[];let got=0;
+      for(;;){const {done,value}=await rd.read();if(done)break;parts.push(value);got+=value.length;if(total&&!quiet)prog("Downloading")(got/total,`Downloading ${(total/1048576).toFixed(1)} MB`)}
+      const u8=new Uint8Array(got);let o=0;for(const p of parts){u8.set(p,o);o+=p.length}
+      ent.buf=await ac().decodeAudioData(u8.buffer);ent.t0=j.start;ent.t1=j.start+ent.buf.duration;ent.peaks=null;
+      if(audioCache.size>14){const k=audioCache.keys().next().value;audioCache.delete(k)}return ent}
+    catch(err){audioCache.delete(key);if(!quiet)msg("Audio: "+err.message);throw err}finally{if(!quiet)busy(false)}})();
+  audioCache.set(key,ent);return ent.p}
+function prefetch(){const n=exs()[S.sel+1];if(n&&!cacheFor(n))loadAudio(n,true).catch(()=>{})}
+
+// ---------------- playback (fades applied live, like the export) ----------------
+let pl=null,playhead=null;
+function gainCurve(e,from,to){const n=Math.max(2,Math.ceil((to-from)*200)),c=new Float32Array(n),L=e.end-e.start,fi=Math.min(e.fade_in||0,L),fo=Math.min(e.fade_out||0,L-fi);
+  for(let i=0;i<n;i++){const t=from+(to-from)*i/(n-1)-e.start;let g=1;if(fi>0.0005&&t<fi)g*=CURVE_F[e.curve_in||"s-curve"](clamp(t/fi,0,1));if(fo>0.0005&&t>L-fo)g*=CURVE_F[e.curve_out||"s-curve"](clamp((L-t)/fo,0,1));c[i]=clamp(g,0,1)}return c}
+async function play(){const e=cx();if(!e)return;if(pl)return stop(true);ac();
+  let start=playhead!=null&&playhead>=e.start&&playhead<e.end-0.05?playhead:e.start;
+  let ent;try{ent=await loadAudio(e)}catch(err){return}if(!ent||!ent.buf||cx()!==e)return;
+  const c=ac(),src=c.createBufferSource(),g=c.createGain();src.buffer=ent.buf;src.connect(g).connect(c.destination);
+  const when=c.currentTime+0.06,dur=e.end-start;g.gain.setValueAtTime(0,c.currentTime);g.gain.setValueCurveAtTime(gainCurve(e,start,e.end),when,Math.max(0.01,dur));
+  src.start(when,Math.max(0,start-ent.t0),dur);const lat=(c.outputLatency||0)+(c.baseLatency||0);
+  pl={src,g,when,lat,from:start,ex:e};src.onended=()=>{if(pl&&pl.src===src)stop(false,true)};$("playBtn").classList.add("on");$("playIco").innerHTML='<path d="M3 2h4v12H3zM9 2h4v12H9z"/>';prefetch();tick()}
+function stop(pause,ended){if(!pl){return}const t=curT();try{pl.src.onended=null;pl.src.stop()}catch(e){}const from=pl.from;pl=null;
+  playhead=(S.ret&&!pause)?from:(ended?cx()&&cx().end:t);lastStop={from,at:ended?(cx()&&cx().end):t};$("playBtn").classList.remove("on");$("playIco").innerHTML='<path d="M3 2v12l11-6z"/>';drawClip();drawOv();updCtr()}
+let lastStop=null;
+function curT(){if(!pl)return playhead;const c=ac();return clamp(pl.from+(c.currentTime-pl.when-pl.lat),pl.from,pl.ex.end)}
+function tick(){if(!pl)return;drawClip();drawOv();updCtr();requestAnimationFrame(tick)}
+function togglePlay(){if(pl)stop(true);else play()}
+function updCtr(){const t=pl?curT():playhead;$("ctrMain").textContent=tc(t!=null?t:(cx()?cx().start:0));const e=cx();$("ctrSel").textContent=e?"SEL "+tc(e.end-e.start,false):"SEL —"}
+$("retBtn").onclick=()=>{S.ret=!S.ret;$("retBtn").classList.toggle("on",S.ret);if(!pl&&lastStop){playhead=S.ret?lastStop.from:lastStop.at;drawClip();updCtr()}persist()};
+
+// ---------------- overview canvas ----------------
+const ov=$("ov"),cv=$("clip");let ovV=[0,1];
+function ovFit(){ovV=[0,DUR()||1]}
+function sizeCanvas(c){const r=c.getBoundingClientRect(),d=devicePixelRatio||1;if(c.width!==Math.round(r.width*d)||c.height!==Math.round(r.height*d)){c.width=Math.round(r.width*d);c.height=Math.round(r.height*d)}return [r.width,r.height,d]}
+function drawOv(){const [W,H,d]=sizeCanvas(ov),g=ov.getContext("2d");g.setTransform(d,0,0,d,0,0);g.clearRect(0,0,W,H);$("empty").style.display=S.an?"none":"";if(!S.an)return;
+  const O=S.an.overview,[a,b]=ovV,X=t=>(t-a)/(b-a)*W,mid=H/2+6;
+  g.fillStyle="#1b1b1b";g.fillRect(0,0,W,14);g.fillStyle="#888";g.font="10px Menlo";const step=niceStep((b-a)/(W/90));
+  for(let t=Math.ceil(a/step)*step;t<b;t+=step){const x=X(t);g.fillRect(x,10,1,4);g.fillText(tc(t,false),x+3,10)}
+  for(let i=0;i<O.peak.length;i++){const t=i*O.hop;if(t<a-O.hop||t>b)continue;const x=X(t),w=Math.max(1,X(t+O.hop)-x+0.5);const amp=Math.pow(10,O.peak[i]/20),h=amp*(H-20)/2;
+    g.fillStyle=O.active[i]>0.3?DYN_COL(O.pos[i]):"#3a3a3a";g.fillRect(x,mid-h,w,Math.max(1,2*h))}
+  exs().forEach((e,i)=>{const x0=X(e.start),x1=X(e.end);g.fillStyle=exColor(e.number)+(i===S.sel?"55":"30");g.fillRect(x0,14,x1-x0,H-14);g.strokeStyle=i===S.sel?"#fff":exColor(e.number);g.lineWidth=i===S.sel?2:1;g.strokeRect(x0+.5,14.5,x1-x0-1,H-15);
+    g.fillStyle=e.enabled===false?"#777":"#fff";g.font="bold 11px Helvetica";g.fillText(String(e.number).padStart(2,"0")+(e.enabled===false?" (off)":""),x0+4,28)});
+  const t=pl?curT():playhead;if(t!=null){g.fillStyle="#fff";g.fillRect(X(t),14,1.5,H-14)}
+  $("legend").innerHTML=O.thresholds.map(([m],k)=>`<span style="color:${DYN_COL(k/5)}">${m}</span>`).join(" ")}
+function niceStep(s){const p=Math.pow(10,Math.floor(Math.log10(s))),n=s/p;return (n<1.5?1:n<3.5?2:n<7.5?5:10)*p}
+let ovPtr=new Map(),ovPinch=null;
+ov.addEventListener("pointerdown",e=>{ov.setPointerCapture(e.pointerId);ovPtr.set(e.pointerId,{x:e.offsetX,x0:e.offsetX,v:ovV.slice(),moved:false});if(ovPtr.size===2){const [p1,p2]=[...ovPtr.values()];ovPinch={d:Math.abs(p1.x-p2.x),v:ovV.slice(),c:(p1.x+p2.x)/2}}});
+ov.addEventListener("pointermove",e=>{const p=ovPtr.get(e.pointerId);if(!p||!S.an)return;p.x=e.offsetX;const W=ov.clientWidth;
+  if(ovPinch&&ovPtr.size===2){const [p1,p2]=[...ovPtr.values()],dd=Math.max(20,Math.abs(p1.x-p2.x)),[a,b]=ovPinch.v,span=clamp((b-a)*ovPinch.d/dd,10,DUR()),ct=a+(b-a)*ovPinch.c/W;let na=ct-span*ovPinch.c/W;na=clamp(na,0,DUR()-span);ovV=[na,na+span];drawOv();return}
+  if(Math.abs(p.x-p.x0)>6){p.moved=true;const span=p.v[1]-p.v[0];if(span<DUR()-0.01){let na=clamp(p.v[0]-(p.x-p.x0)/W*span,0,DUR()-span);ovV=[na,na+span];drawOv()}}});
+ov.addEventListener("pointerup",e=>{const p=ovPtr.get(e.pointerId);ovPtr.delete(e.pointerId);if(ovPtr.size<2)ovPinch=null;if(!p||p.moved||!S.an)return;
+  const t=ovV[0]+(ovV[1]-ovV[0])*e.offsetX/ov.clientWidth,i=exs().findIndex(x=>t>=x.start&&t<=x.end);
+  if(i>=0){selectEx(i,t)}else{const near=exs().reduce((m,x,k)=>Math.min(Math.abs(x.start-t),Math.abs(x.end-t))<m.d?{d:Math.min(Math.abs(x.start-t),Math.abs(x.end-t)),k}:m,{d:1e9,k:-1});if(near.k>=0)selectEx(near.k)}});
+ov.addEventListener("pointercancel",e=>{ovPtr.delete(e.pointerId);ovPinch=null});
+ov.addEventListener("dblclick",()=>{ovFit();drawOv()});
+
+// ---------------- clip editor ----------------
+let clV=[0,1];
+function clipFit(){const e=cx();if(!e){clV=[0,1];return}const pad=Math.min(HANDLE,Math.max(1,(e.end-e.start)*0.04));clV=[Math.max(0,e.start-pad),Math.min(DUR(),e.end+pad)]}
+function peaksOf(ent){if(ent.peaks)return ent.peaks;const b=ent.buf,K=128,n=Math.ceil(b.length/K),mx=new Float32Array(n),mn=new Float32Array(n),chs=[...Array(b.numberOfChannels)].map((_,c)=>b.getChannelData(c));
+  for(let i=0;i<n;i++){let hi=-1,lo=1;const s=i*K,e2=Math.min(b.length,s+K);for(const ch of chs)for(let j=s;j<e2;j++){const v=ch[j];if(v>hi)hi=v;if(v<lo)lo=v}mx[i]=hi;mn[i]=lo}ent.peaks={mx,mn,K,sr:b.sampleRate};return ent.peaks}
+const FH=26;// fade handle size
+function geo(){const W=cv.clientWidth,H=cv.clientHeight,[a,b]=clV;return {W,H,a,b,X:t=>(t-a)/(b-a)*W,T:x=>a+(b-a)*x/W,top:18,bot:H-30}}
+function drawClip(){const [W,H,d]=sizeCanvas(cv),g=cv.getContext("2d");g.setTransform(d,0,0,d,0,0);g.clearRect(0,0,W,H);const e=cx();
+  if(!e){g.fillStyle="#666";g.font="13px Helvetica";g.fillText(S.an?"Find excerpts, then tap one to fine-tune its edges and fades here.":"",16,30);return}
+  const G=geo(),{X,top,bot}=G,col=exColor(e.number),mid=(top+bot)/2,hh=(bot-top)/2;
+  g.fillStyle="#1b1b1b";g.fillRect(0,0,W,top);g.fillStyle="#888";g.font="10px Menlo";const step=niceStep((G.b-G.a)/(W/90));
+  for(let t=Math.ceil(G.a/step)*step;t<G.b;t+=step){const x=X(t);g.fillRect(x,top-5,1,5);g.fillText(tc(t,step<1),x+3,top-6)}
+  g.fillStyle=col+"26";g.fillRect(X(e.start),top,X(e.end)-X(e.start),bot-top);
+  const ent=cacheFor(e);
+  if(ent&&ent.buf){const P=peaksOf(ent);g.fillStyle="#cfcfcf";for(let x=0;x<W;x++){const t0=G.T(x),t1=G.T(x+1);let i0=Math.floor((t0-ent.t0)*P.sr/P.K),i1=Math.max(i0+1,Math.floor((t1-ent.t0)*P.sr/P.K));if(i1<=0||i0>=P.mx.length)continue;i0=Math.max(0,i0);i1=Math.min(P.mx.length,i1);
+      let hi=-1,lo=1;for(let i=i0;i<i1;i++){if(P.mx[i]>hi)hi=P.mx[i];if(P.mn[i]<lo)lo=P.mn[i]}const inside=t0>=e.start&&t0<=e.end;g.fillStyle=inside?"#e2e2e2":"#6a6a6a";g.fillRect(x,mid-hi*hh,1,Math.max(1,(hi-lo)*hh))}}
+  else{g.fillStyle="#777";g.font="12px Helvetica";g.fillText(cacheFor(e)===null&&audioCache.size?"Loading audio…":"Tap ▶ or Space to load and play",X(e.start)+10,mid)}
+  g.fillStyle="#000a";g.fillRect(0,top,Math.max(0,X(e.start)),bot-top);g.fillRect(X(e.end),top,W-X(e.end),bot-top);
+  // fades (gain curves drawn over the waveform)
+  const L=e.end-e.start,fi=Math.min(e.fade_in||0,L),fo=Math.min(e.fade_out||0,L-fi);
+  g.strokeStyle="#ffd34d";g.lineWidth=2;g.beginPath();for(let k=0;k<=40;k++){const t=k/40,x=X(e.start+fi*t),y=bot-(bot-top)*CURVE_F[e.curve_in||"s-curve"](t);k?g.lineTo(x,y):g.moveTo(x,y)}g.stroke();
+  g.beginPath();for(let k=0;k<=40;k++){const t=k/40,x=X(e.end-fo+fo*t),y=bot-(bot-top)*CURVE_F[e.curve_out||"s-curve"](1-t);k?g.lineTo(x,y):g.moveTo(x,y)}g.stroke();
+  g.fillStyle="#ffd34d";g.fillRect(X(e.start+fi)-FH/2,top,FH,FH);g.fillRect(X(e.end-fo)-FH/2,top,FH,FH);g.fillStyle="#222";g.font="bold 10px Helvetica";g.fillText("IN",X(e.start+fi)-7,top+17);g.fillText("OUT",X(e.end-fo)-10,top+17);
+  // trim edges with grab tabs
+  for(const [t,lab] of [[e.start,"["],[e.end,"]"]]){const x=X(t);g.fillStyle=col;g.fillRect(x-1.5,top,3,bot-top);g.fillRect(x-16,bot,32,H-bot-2);g.fillStyle="#fff";g.font="bold 14px Helvetica";g.fillText(lab,x-4,bot+19)}
+  const pt=pl?curT():playhead;if(pt!=null&&pt>=G.a&&pt<=G.b){g.fillStyle="#fff";g.fillRect(X(pt)-0.75,0,1.5,H)}}
+let drag=null,clPtr=new Map(),clPinch=null;
+cv.addEventListener("pointerdown",e=>{const x=cx();if(!x)return;cv.setPointerCapture(e.pointerId);clPtr.set(e.pointerId,{x:e.offsetX});
+  if(clPtr.size===2){drag=null;const [p1,p2]=[...clPtr.values()];clPinch={d:Math.abs(p1.x-p2.x),v:clV.slice(),c:(p1.x+p2.x)/2};return}
+  const G=geo(),px=e.offsetX,py=e.offsetY,L=x.end-x.start,fi=Math.min(x.fade_in||0,L),fo=Math.min(x.fade_out||0,L-fi);let kind=null;
+  if(py<=G.top+FH+8){if(Math.abs(px-G.X(x.start+fi))<FH)kind="fi";else if(Math.abs(px-G.X(x.end-fo))<FH)kind="fo"}
+  if(!kind){if(Math.abs(px-G.X(x.start))<(py>G.bot?22:14))kind="start";else if(Math.abs(px-G.X(x.end))<(py>G.bot?22:14))kind="end"}
+  if(kind){snap();drag={kind,x0:px,orig:clone(x),moved:false}}else drag={kind:"pan",x0:px,v:clV.slice(),moved:false}});
+cv.addEventListener("pointermove",e=>{const p=clPtr.get(e.pointerId);if(!p)return;p.x=e.offsetX;const x=cx();if(!x)return;const G=geo();
+  if(clPinch&&clPtr.size===2){const [p1,p2]=[...clPtr.values()],dd=Math.max(20,Math.abs(p1.x-p2.x)),[a,b]=clPinch.v,span=clamp((b-a)*clPinch.d/dd,0.5,DUR()),ct=a+(b-a)*clPinch.c/G.W;let na=clamp(ct-span*clPinch.c/G.W,0,DUR()-span);clV=[na,na+span];drawClip();return}
+  if(!drag)return;const dx=e.offsetX-drag.x0;if(Math.abs(dx)>3)drag.moved=true;if(!drag.moved)return;const dt=dx/G.W*(G.b-G.a),o=drag.orig;
+  if(drag.kind==="pan"){const span=drag.v[1]-drag.v[0];let na=clamp(drag.v[0]-dt,0,Math.max(0,DUR()-span));clV=[na,na+span]}
+  else if(drag.kind==="start"){x.start=clamp(o.start+dt,0,o.end-1);fixFades(x)}
+  else if(drag.kind==="end"){x.end=clamp(o.end+dt,o.start+1,DUR());fixFades(x)}
+  else if(drag.kind==="fi"){x.fade_in=+clamp((o.fade_in||0)+dt,0,x.end-x.start-(x.fade_out||0)).toFixed(3)}
+  else if(drag.kind==="fo"){x.fade_out=+clamp((o.fade_out||0)-dt,0,x.end-x.start-(x.fade_in||0)).toFixed(3)}
+  if(drag.kind!=="pan"){if(pl)stop(true);renderClipBar();drawOv()}drawClip()});
+cv.addEventListener("pointerup",e=>{clPtr.delete(e.pointerId);if(clPtr.size<2)clPinch=null;const d=drag;drag=null;const x=cx();if(!d||!x)return;
+  if(!d.moved){if(d.kind!=="pan")undoS.pop();const t=geo().T(e.offsetX);playhead=clamp(t,x.start,x.end-0.01);if(pl){stop(true);play()}drawClip();drawOv();updCtr();return}
+  if(d.kind==="pan")return;const lab={start:"start",end:"end",fi:"fade in",fo:"fade out"}[d.kind];
+  if(d.kind==="start"||d.kind==="end"){refreshDesc(x);if(!cacheFor(x))loadAudio(x,true).then(drawClip).catch(()=>{})}
+  changed(`Ex ${String(x.number).padStart(2,"0")} · ${lab} ${d.kind[0]==="f"?(x[d.kind==="fi"?"fade_in":"fade_out"]).toFixed(2)+"s":tc(x[d.kind])}`)});
+cv.addEventListener("pointercancel",e=>{clPtr.delete(e.pointerId);clPinch=null;if(drag&&drag.kind!=="pan"&&drag.moved){Object.assign(cx(),drag.orig);undoS.pop()}drag=null;drawClip()});
+cv.addEventListener("wheel",e=>{e.preventDefault();const G=geo(),span=G.b-G.a;if(e.ctrlKey||e.metaKey){const f=Math.exp(e.deltaY*0.01),ns=clamp(span*f,0.5,DUR()),ct=G.T(e.offsetX);let na=clamp(ct-ns*e.offsetX/G.W,0,DUR()-ns);clV=[na,na+ns]}else{let na=clamp(G.a+(e.deltaX||e.deltaY)/G.W*span,0,DUR()-span);clV=[na,na+span]}drawClip()},{passive:false});
+function fixFades(x){const L=x.end-x.start;x.fade_in=Math.min(x.fade_in||0,L/2);x.fade_out=Math.min(x.fade_out||0,L-x.fade_in)}
+function zoom(f){const G=geo(),span=clamp((G.b-G.a)*f,0.5,DUR()),c=(G.a+G.b)/2;let na=clamp(c-span/2,0,DUR()-span);clV=[na,na+span];drawClip()}
+$("zIn").onclick=()=>zoom(0.6);$("zOut").onclick=()=>zoom(1/0.6);$("zFit").onclick=()=>{clipFit();drawClip()};
+
+// ---------------- clip fields ----------------
+function renderClipBar(){const e=cx();for(const id of ["fStart","fEnd","fFi","fFo","cIn","cOut","incBtn","resetBtn","fadesAllBtn"])$(id).disabled=!e;
+  if(!e){$("fStart").value=$("fEnd").value=$("fFi").value=$("fFo").value="";$("fLen").textContent="—";$("desc").textContent="—";$("clipInfo").textContent="—";return}
+  if(document.activeElement!==$("fStart"))$("fStart").value=tc(e.start);if(document.activeElement!==$("fEnd"))$("fEnd").value=tc(e.end);
+  if(document.activeElement!==$("fFi"))$("fFi").value=(e.fade_in||0).toFixed(2);if(document.activeElement!==$("fFo"))$("fFo").value=(e.fade_out||0).toFixed(2);
+  $("cIn").value=e.curve_in||"s-curve";$("cOut").value=e.curve_out||"s-curve";$("fLen").textContent=tc(e.end-e.start);
+  $("incBtn").classList.toggle("on",e.enabled!==false);$("incBtn").textContent=e.enabled!==false?"Included":"Excluded";
+  const d=e.description||{};$("desc").innerHTML=d.text?`<b>${esc(d.marking||"")}</b> &nbsp;${esc(d.text)}`:"—";
+  $("clipInfo").textContent=`Excerpt ${String(e.number).padStart(2,"0")} · ${(curSet().meta||{}).length||""}${e.rx_path?" · RX ✓":""}`}
+function edit(label,fn){const e=cx();if(!e)return;snap();fn(e);fixFades(e);changed(label);if(pl){stop(true)}}
+function fieldTime(id,k){$(id).addEventListener("change",()=>{const v=parseT($(id).value),e=cx();if(!e||isNaN(v))return renderClipBar();
+  edit(`Ex ${String(e.number).padStart(2,"0")} · ${k} ${tc(v)}`,x=>{if(k==="start")x.start=clamp(v,0,x.end-1);else x.end=clamp(v,x.start+1,DUR())});refreshDesc(e)})}
+fieldTime("fStart","start");fieldTime("fEnd","end");
+for(const [id,k,lab] of [["fFi","fade_in","fade in"],["fFo","fade_out","fade out"]])$(id).addEventListener("change",()=>{const v=parseFloat($(id).value),e=cx();if(!e||isNaN(v))return renderClipBar();edit(`Ex ${String(e.number).padStart(2,"0")} · ${lab} ${v.toFixed(2)}s`,x=>{x[k]=Math.max(0,v)})});
+for(const [id,k] of [["cIn","curve_in"],["cOut","curve_out"]])$(id).addEventListener("change",()=>{const e=cx();if(!e)return;edit(`Ex ${String(e.number).padStart(2,"0")} · ${k.replace("_"," ")} ${$(id).value}`,x=>{x[k]=$(id).value})});
+$("clipBar").addEventListener("click",ev=>{const b=ev.target.closest(".nud");if(!b)return;const [k,dv]=b.dataset.n.split(","),e=cx();if(!e)return;edit(`Ex ${String(e.number).padStart(2,"0")} · nudge ${k}`,x=>{if(k==="start")x.start=clamp(x.start+ +dv,0,x.end-1);else x.end=clamp(x.end+ +dv,x.start+1,DUR())});refreshDesc(e);if(!cacheFor(e))loadAudio(e,true).then(drawClip).catch(()=>{})});
+$("incBtn").onclick=()=>{const e=cx();if(e)edit(`Ex ${String(e.number).padStart(2,"0")} · ${e.enabled!==false?"excluded":"included"}`,x=>{x.enabled=x.enabled===false})};
+$("resetBtn").onclick=()=>{const e=cx();if(!e||!e._orig)return;edit(`Ex ${String(e.number).padStart(2,"0")} · reset`,x=>{[x.start,x.end,x.fade_in,x.fade_out,x.curve_in,x.curve_out]=x._orig});refreshDesc(e);clipFit();drawClip()};
+$("fadesAllBtn").onclick=()=>{const e=cx();if(!e)return;snap();for(const x of exs()){x.fade_in=e.fade_in;x.fade_out=e.fade_out;x.curve_in=e.curve_in;x.curve_out=e.curve_out;fixFades(x)}changed(`All excerpts · fades from Ex ${String(e.number).padStart(2,"0")}`);toast("Fades and curves copied to every excerpt")};
+
+// ---------------- list ----------------
+function renderList(){const body=$("listBody");body.innerHTML=exs().map((e,i)=>{const d=e.description||{};return `<tr data-i="${i}" class="${i===S.sel?"sel":""} ${e.enabled===false?"off":""}"><td><span class="sw" style="background:${exColor(e.number)}"></span>${String(e.number).padStart(2,"0")}${e.rx_path?" ᴿˣ":""}</td><td>${tc(e.start)}</td><td>${tc(e.end)}</td><td>${tc(e.end-e.start,false)}</td><td class="mk">${esc(d.marking||"")}</td><td class="mk">${esc(d.contour||"")}</td><td style="font-family:var(--ui)">${esc((d.shape||"").replace(/ \(.*\)/,""))}</td><td>${(e.fade_in||0).toFixed(2)} / ${(e.fade_out||0).toFixed(2)}</td><td><button class="inc" data-inc="${i}">${e.enabled===false?"off":"on"}</button></td></tr>`}).join("")||`<tr><td colspan="9" style="color:var(--dim);font-family:var(--ui)">${S.an?"No excerpts yet — Find Excerpts.":"Open a recording."}</td></tr>`;
+  const r=body.querySelector("tr.sel");if(r&&r.scrollIntoViewIfNeeded)r.scrollIntoViewIfNeeded(false)}
+$("listBody").addEventListener("click",ev=>{const b=ev.target.closest("[data-inc]");if(b){ev.stopPropagation();const i=+b.dataset.inc;S.sel=i;const e=cx();edit(`Ex ${String(e.number).padStart(2,"0")} · ${e.enabled!==false?"excluded":"included"}`,x=>{x.enabled=x.enabled===false});return}
+  const r=ev.target.closest("tr[data-i]");if(r)selectEx(+r.dataset.i)});
+function selectEx(i,t){if(i<0||i>=exs().length)return;const was=pl;if(pl)stop(true);S.sel=i;const e=cx();playhead=t!=null?clamp(t,e.start,e.end-0.01):e.start;clipFit();renderAll();persist();
+  loadAudio(e,!!was).then(()=>{drawClip();if(was)play()}).catch(()=>{})}
+
+// ---------------- sets / lengths / RX side ----------------
+function renderSets(){const ids=S.sets.map(s=>s.id),i=ids.indexOf(S.cur),s=curSet();$("setLab").textContent=s?`${i+1}/${ids.length} · ${s.label}`:"—";$("setPrev").disabled=i<=0;$("setNext").disabled=i<0||i>=ids.length-1;
+  const fam=s?family(S.cur).slice().sort((a,b)=>parseT((b.meta||{}).length||0)-parseT((a.meta||{}).length||0)):[];
+  $("lenPills").innerHTML=fam.map(f=>`<button data-set="${f.id}" class="${f.id===S.cur?"on":""}">${esc((f.meta||{}).length||"?")}</button>`).join("")||'<span class="note">—</span>'}
+$("lenPills").addEventListener("click",e=>{const b=e.target.closest("[data-set]");if(b)goSet(+b.dataset.set)});
+$("setPrev").onclick=()=>stepSet(-1);$("setNext").onclick=()=>stepSet(1);
+function renderRx(){const has=!!S.rx_full;$("abBtn").disabled=!has;$("abBtn").textContent=S.side==="after"&&has?"RX: AFTER":"RX: BEFORE";$("abBtn").classList.toggle("after",S.side==="after"&&has);
+  $("rxInfo").textContent=has?`RX version: ${S.rx_full.split("/").pop()} · listening to ${S.side==="after"?"AFTER (processed)":"BEFORE (original)"}`:(S.rxJob?"Waiting for ⌘S in RX…":"No RX version yet.");
+  $("sideTxt").textContent=has?(S.side==="after"?"RX AFTER":"RX BEFORE"):""}
+$("abBtn").onclick=async()=>{if(!S.rx_full)return;const side=S.side==="after"?"before":"after",t=pl?curT():null,was=!!pl;if(pl)stop(true);
+  const j=await run("Switching",()=>pe("rx_side",{side}));if(!j)return;S.side=j.side;S.dirty=true;persist();renderRx();toast("Listening to: "+(side==="after"?"RX-processed (AFTER)":"original (BEFORE)"));
+  if(was){playhead=t;play()}else{const e=cx();if(e)loadAudio(e).then(drawClip).catch(()=>{})}};
+
+// ---------------- export ----------------
+async function exportAll(){if(!exs().length)return toast("Find excerpts first");stop();
+  if(!S.session){const r=await dialog("Save first",`<p>Exports go into the session's project folder (<b>Bounced Excerpts</b>), like a DAW. Save the session now?</p>`,["Cancel","Save"]);if(r!=="Save"||!await save())return}
+  const fam=family(S.cur);let batches=[exs()];
+  if(fam.length>1){const labs=fam.map(f=>(f.meta||{}).length).join(" + ");const r=await dialog("Export",`<p>Export all lengths (${esc(labs)})? File names include the length.</p>`,["Cancel","Only this length","All lengths"]);if(r==="Cancel")return;if(r==="All lengths")batches=[exs()].concat(fam.filter(f=>f.id!==S.cur).map(f=>f.exs))}
+  const args={batches:batches.map(b=>b.map(stripEx)),fade_in:+S.settings.fade_in||0.05,fade_out:S.settings.fade_out===""?1.5:+S.settings.fade_out,normalize:S.settings.normalize};
+  const chk=await run("Checking the export folder",()=>pe("export",Object.assign({mode:"check"},args)));if(!chk)return;let mode="replace";
+  const insNote=S.inserts?`<p style="color:var(--warn)">This session's ${S.inserts} insert plugin(s) aren't applied in iPad exports — export on the Mac to include them.</p>`:"";
+  if(chk.clash){const r=await dialog("Already bounced",`<p>${chk.clash} of ${chk.count} files are already in<br><span class="crumb">${esc(chk.out_dir)}</span></p>${insNote}`,["Cancel","Keep both","Replace"]);if(r==="Cancel")return;mode=r==="Replace"?"replace":"keep"}
+  else{const r=await dialog("Export",`<p>${chk.count} file(s) from the <b>${chk.side==="after"?"RX-processed (AFTER)":"original (BEFORE)"}</b> recording into<br><span class="crumb">${esc(chk.out_dir)}</span></p>${insNote}`,["Cancel","Export"]);if(r!=="Export")return}
+  const j=await run("Exporting on the Mac",p=>pe("export",Object.assign({mode},args),p));if(!j)return;msg(`✓ Exported ${j.count} file(s) to ${j.out_dir}`);
+  dialog("Export done",`<p>✓ ${j.count} file(s) with names, timestamps and BWF/iXML metadata, plus the CSV/JSON manifest, in:</p><p class="crumb">${esc(j.out_dir)}</p>`,["OK"])}
+
+// ---------------- RX 12 on the Mac (whole recording) ----------------
+let rfb=null,rxRetry=0,rxRetryT=null,rxPollT=null;
+function rxStatus(t){$("rxStat").textContent=t}
+function openRxWin(){$("rxw").classList.add("open");$("rxw").classList.remove("min");rxConnect()}
+async function rxOpenWhole(){if(!S.an)return toast("Open a recording first");if(!paired())return pairDialog();stop();
+  let fresh=false;if(S.rx_full){const r=await dialog("RX 12",`<p>Continue working on the RX version (stack more processing), or start again from the original recording?</p>`,["Cancel","Start from original","Continue RX version"]);if(r==="Cancel")return;fresh=r==="Start from original"}
+  if(!S.session){const r=await dialog("Save first?",`<p>Saving first puts the RX copy in the session's <b>RX Files</b> folder. Otherwise it goes next to the recording.</p>`,["Not now","Save"]);if(r==="Save"&&!await save())return}
+  openRxWin();rxStatus("Copying the recording for RX…");
+  const j=await run("Preparing RX copy on the Mac",p=>pe("rx_prepare",{fresh},p,1));if(!j){rxStatus("Couldn't prepare");return}
+  S.rxJob={id:j.job,path:j.path,applied:0};persist();renderRx();rxStatus("Open in RX — ⌘A → Azimuth Learn → Render → Phase Learn → Render → ⌘S");startRxPoll()}
+function startRxPoll(){clearInterval(rxPollT);if(S.rxJob)rxPollT=setInterval(rxPoll,1500)}
+let rxPolling=false;
+async function rxPoll(){if(!S.rxJob||rxPolling)return;rxPolling=true;try{const j=await (await bfetch("/api/jobs/"+S.rxJob.id)).json();
+    if(j.version>S.rxJob.applied){rxStatus("RX save detected — checking it…");try{const r=await pe("rx_loaded",{path:S.rxJob.path});S.rxJob.applied=j.version;S.rx_full=r.rx_full;S.side="after";S.dirty=true;audioCache.clear();persist();renderRx();
+        rxStatus("✓ Loaded as RX: AFTER — ⌘S again to update");toast("RX version loaded — RX: AFTER/BEFORE compares them");const e=cx();if(e)loadAudio(e,true).then(drawClip).catch(()=>{})}
+      catch(err){S.rxJob.applied=j.version;persist();rxStatus("Not used: "+err.message);dialog("RX version not used",`<p>${esc(err.message)}</p>`,["OK"])}}}
+  catch(e){if(/unknown job|404/.test(e.message)){clearInterval(rxPollT);S.rxJob=null;persist();renderRx();rxStatus("The Mac bridge restarted — open in RX again")}else rxStatus("Waiting for the Mac… ("+e.message+")")}finally{rxPolling=false}}
+async function rxConnect(){if(rfb)return;clearTimeout(rxRetryT);const scr=$("rxScreen");scr.innerHTML="";
+  try{const {default:RFB}=await import(new URL("novnc/core/rfb.js",location.href).href);
+    rfb=new RFB(scr,base().replace(/^http/,"ws")+"/vnc?token="+encodeURIComponent(cfg.token),{credentials:{username:cfg.user||"",password:cfg.pass||""},wsProtocols:["binary"]});
+    rfb.scaleViewport=true;rfb.resizeSession=false;rfb.showDotCursor=true;rfb.qualityLevel=cfg.low?4:7;rfb.compressionLevel=cfg.low?6:2;let up=false,secFail=false;
+    rfb.addEventListener("connect",()=>{up=true;rxRetry=0;$("rxConn").textContent="Mac screen connected"});
+    rfb.addEventListener("disconnect",e=>{rfb=null;if(secFail)return;if($("rxw").classList.contains("open")&&!e.detail.clean&&rxRetry<8){const w=Math.min(15,2**rxRetry);rxRetry++;$("rxConn").textContent=`Reconnecting in ${w}s…`;rxRetryT=setTimeout(rxConnect,w*1000);return}
+      $("rxConn").textContent=up?"Screen view closed":"Couldn't open the Mac screen — check Screen Sharing is on"});
+    rfb.addEventListener("securityfailure",e=>{secFail=true;$("rxConn").textContent="Mac rejected the login — check user name/password (Pair with Mac…)"});
+    rfb.addEventListener("credentialsrequired",()=>{dialog("Mac Login",`<div class="f">User name<input type="text" id="l1" value="${esc(cfg.user||"")}" autocapitalize="off"></div><div class="f">Password<input type="password" id="l2"></div>`,["Cancel","Connect"]).then(r=>{if(r!=="Connect"||!rfb)return;cfg.user=$("l1").value.trim();cfg.pass=$("l2").value;saveCfg();rfb.sendCredentials({username:cfg.user,password:cfg.pass})})});
+    $("rxConn").textContent="Connecting to the Mac screen…"}catch(e){$("rxConn").textContent="Screen view unavailable: "+e.message}}
+function rxScroll(dir){if(!rfb)return;const p=rfb._mousePos||{},bit=dir<0?8:16,m=rfb._mouseButtonMask||0;try{rfb._sendMouse&&(rfb._sendMouse(p.x||0,p.y||0,m|bit),rfb._sendMouse(p.x||0,p.y||0,m))}catch(e){}}
+$("rxBtn").onclick=()=>{if(!paired())return pairDialog();openRxWin()};
+$("rxOpenBtn").onclick=rxOpenWhole;
+$("rxSave").onclick=async()=>{if(!S.rxJob)return toast("Open the whole recording in RX first");try{await bfetch(`/api/jobs/${S.rxJob.id}/save`,{method:"POST"});rxStatus("⌘S sent to RX")}catch(e){rxStatus(e.message)}};
+$("rxScrollUp").onclick=()=>rxScroll(-1);$("rxScrollDn").onclick=()=>rxScroll(1);
+$("rxRe").onclick=()=>{try{rfb&&rfb.disconnect()}catch(e){}rfb=null;rxRetry=0;rxConnect()};
+$("rxMin").onclick=()=>$("rxw").classList.toggle("min");
+$("rxClose").onclick=()=>{$("rxw").classList.remove("open");try{rfb&&rfb.disconnect()}catch(e){}rfb=null};
+
+// ---------------- render ----------------
+function renderAll(){drawOv();drawClip();renderClipBar();renderList();renderSets();renderRx();updCtr();
+  const has=!!S.an;for(const id of ["saveBtn","findBtn","exportBtn","makeAlt","rxOpenBtn"])$(id).disabled=!has;$("exportBtn").disabled=!exs().length;
+  $("undoBtn").disabled=!undoS.length;$("redoBtn").disabled=!redoS.length;$("prevBtn").disabled=$("nextBtn").disabled=!exs().length;
+  $("sessName").textContent=(S.name||(S.an?S.an.name:"No session"))+(S.dirty?" •":"");$("retBtn").classList.toggle("on",S.ret);
+  if(S.an){const a=S.an;$("anInfo").innerHTML=`${esc(a.name)}<br>${tc(a.duration,false)} · ${a.sr/1000} kHz · ${a.subtype.replace("PCM_","")}-bit · ${a.channels===2?"stereo":a.channels+" ch"}<br>${a.integrated_lufs} LUFS · LRA ${a.lra} LU · peak ${a.peak_db} dBFS<br>dynamic range used: pp ${a.floor} → ff ${a.ceiling} LUFS`;
+    $("ovInfo").textContent=`${a.name} · ${tc(a.duration,false)}`}else{$("anInfo").textContent="—";$("ovInfo").textContent=""}persist()}
+function resize(){drawOv();drawClip()}
+addEventListener("resize",()=>setTimeout(resize,50));new ResizeObserver(()=>resize()).observe($("center"));
+
+// ---------------- buttons + keys ----------------
+$("openBtn").onclick=$("openBtn2").onclick=()=>openDialog();$("saveBtn").onclick=()=>save();$("findBtn").onclick=find;$("makeAlt").onclick=makeAlt;$("exportBtn").onclick=exportAll;
+$("undoBtn").onclick=()=>doUndo(false);$("redoBtn").onclick=()=>doUndo(true);$("pairBtn").onclick=pairDialog;
+$("playBtn").onclick=togglePlay;$("stopBtn").onclick=()=>{if(pl)stop(false);else{const e=cx();if(e){playhead=e.start;drawClip();drawOv();updCtr()}}};
+$("prevBtn").onclick=()=>selectEx(Math.max(0,S.sel-1));$("nextBtn").onclick=()=>selectEx(Math.min(exs().length-1,S.sel+1));
+// a tapped button never keeps focus (so Space can't "click" it again)
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(b)setTimeout(()=>b.blur(),0)},true);
+// clicking outside a text box gives the space bar back to play/stop
+document.addEventListener("pointerdown",e=>{const a=document.activeElement;if(a&&/INPUT|SELECT|TEXTAREA/.test(a.tagName)&&!e.target.closest("input,select,textarea"))a.blur()},true);
+document.addEventListener("keydown",e=>{const inField=/INPUT|SELECT|TEXTAREA/.test((document.activeElement||{}).tagName||"");
+  if(e.key==="Enter"&&inField){document.activeElement.blur();return}if(e.key==="Escape"){if($("dlg").classList.contains("open"))closeDlg("Cancel");else if(inField)document.activeElement.blur();return}
+  const k=e.key.toLowerCase();if(e.metaKey||e.ctrlKey){if(k==="s"){e.preventDefault();save(e.shiftKey)}else if(k==="z"){e.preventDefault();doUndo(e.shiftKey)}else if(k==="o"){e.preventDefault();openDialog()}return}
+  if(inField||$("dlg").classList.contains("open"))return;
+  if(e.code==="Space"){e.preventDefault();togglePlay()}else if(e.key==="ArrowLeft"){e.preventDefault();selectEx(Math.max(0,S.sel-1))}else if(e.key==="ArrowRight"){e.preventDefault();selectEx(Math.min(exs().length-1,S.sel+1))}
+  else if(k==="t"||e.key==="]")zoom(0.6);else if(k==="r"||e.key==="[")zoom(1/0.6)});
+$("tabEdit").addEventListener("click",async e=>{if(S.dirty&&S.an){persist()}});
+addEventListener("pagehide",()=>{try{const o=Object.assign({},S);o.an=S.an?{path:S.an.path}:null;localStorage.setItem("kjd-pe-state",JSON.stringify(o))}catch(e){}});
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){pingMac();if(S.rxJob)rxPoll()}});
+
+// ---------------- start: restore where you left off ----------------
+(async function boot(){fillSettings();const o=loadLocal();
+  if(o){S=Object.assign(blank(),o);fillSettings();ovFit();clipFit();renderAll();msg(`Restored “${S.name||S.an.name}”${S.dirty?" (unsaved changes kept on this iPad)":""}`)}else renderAll();
+  if(!paired()){setConn("","Mac: not paired");msg("Pair with your studio Mac to begin (same pairing as the Edit page)");return}
+  const j=await pingMac();if(!j||!S.an)return;
+  try{const p=await pe("ping");if(p.open!==S.an.path){msg("Reconnecting to the recording on the Mac…");
+      const r=S.session?await pe("open_session",{path:S.session},prog("Reopening session"),1):await pe("open_audio",{paths:S.sources.length?S.sources:[S.an.path]},prog("Reopening recording"),1);
+      S.an=r.analysis;if(S.rx_full){try{await pe("rx_loaded",{path:S.rx_full});await pe("rx_side",{side:S.side})}catch(e){S.rx_full=null;S.side="before";msg("RX version not found on the Mac – using the original")}}  /* local edits (if any) stay as they are */
+      renderAll();msg("Ready — reconnected to the Mac")}
+    if(S.rxJob)startRxPoll()}catch(e){msg("Mac: "+e.message)}})();
+</script>
+</body>
+</html>
